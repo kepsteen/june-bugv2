@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
-import { appUsersApi } from '@/lib/api';
+import { useCompleteOnboardingMutation } from '@/hooks/api';
 import { Check } from 'lucide-react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -312,6 +312,23 @@ export function OnboardingPage() {
   const [isComplete, setIsComplete] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  
+  const completeOnboardingMutation = useCompleteOnboardingMutation({
+    onSuccess: () => {
+      navigate('/entries');
+    },
+    onError: () => {
+      setIsSubmitting(false);
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          content: "Sorry, something went wrong saving your preferences. Please try again.",
+        },
+      ]);
+      setIsComplete(false);
+    },
+  });
 
   const currentQuestion = QUESTIONS[currentQuestionIndex];
   const currentPhaseIndex = currentQuestion
@@ -362,27 +379,26 @@ export function OnboardingPage() {
       }, 900);
     } else {
       // All questions answered
-      setIsTyping(true);
-      setTimeout(async () => {
-        setMessages((prev) => [
-          ...prev,
-          {
-            role: 'assistant',
-            content:
-              "You're all set! Let me save your preferences and take you to your journal.",
-          },
-        ]);
-        setIsTyping(false);
-        setIsComplete(true);
-        setIsSubmitting(true);
+        setIsTyping(true);
+        setTimeout(() => {
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: 'assistant',
+              content:
+                "You're all set! Let me save your preferences and take you to your journal.",
+            },
+          ]);
+          setIsTyping(false);
+          setIsComplete(true);
+          setIsSubmitting(true);
 
-        try {
           const techStackRaw = newAnswers['techStack'];
           const techStack = typeof techStackRaw === 'string'
             ? techStackRaw.split(',').map((t) => t.trim()).filter(Boolean)
             : (techStackRaw as string[]);
 
-          await appUsersApi.completeOnboarding({
+          completeOnboardingMutation.mutate({
             fullName: newAnswers['fullName'] as string,
             age: newAnswers['age'] ? Number(newAnswers['age']) : undefined,
             currentRole: newAnswers['currentRole'] as string,
@@ -395,21 +411,7 @@ export function OnboardingPage() {
             journalingTime: newAnswers['journalingTime'] as string,
             notificationPreferences: newAnswers['notificationPreferences'] as string[],
           });
-
-          navigate('/entries');
-        } catch {
-          setIsSubmitting(false);
-          setMessages((prev) => [
-            ...prev,
-            {
-              role: 'assistant',
-              content:
-                "Sorry, something went wrong saving your preferences. Please try again.",
-            },
-          ]);
-          setIsComplete(false);
-        }
-      }, 1000);
+        }, 1000);
     }
   };
 

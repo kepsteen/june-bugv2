@@ -14,8 +14,8 @@ import { Badge } from '@/components/ui/badge';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { useSession, signOut } from '@/lib/auth-client';
 import { ArrowLeft, User } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
-import { appUsersApi, type AppUser } from '@/lib/api';
+import { useGetCurrentAppUserQuery } from '@/hooks/api';
+import type { AppUser } from '@/lib/api';
 
 function getInitials(name: string | null | undefined): string {
   if (!name) return '?';
@@ -97,9 +97,7 @@ export function SettingsPage() {
   const { data: session, isPending } = useSession();
   const navigate = useNavigate();
 
-  const { data: appUserData } = useQuery({
-    queryKey: ['appUser', 'me'],
-    queryFn: () => appUsersApi.getMe(),
+  const { data: appUserData } = useGetCurrentAppUserQuery({
     enabled: !!session?.user,
   });
 
