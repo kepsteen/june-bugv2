@@ -1,0 +1,11 @@
+{
+  "name": "@starter/shared",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "./src/types/index.ts",
+  "types": "./src/types/index.ts",
+  "exports": {
+    ".": "./src/types/index.ts",
+    "./types": "./src/types/index.ts"
+  }
+}
