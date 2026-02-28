@@ -1,7 +1,7 @@
 import { relations } from 'drizzle-orm';
 import { pgTable, uuid, timestamp, uniqueIndex } from 'drizzle-orm/pg-core';
-import { entries } from '../entries/entries.table.js';
-import { tags } from '../tags/tags.table.js';
+import { entries } from '../entries/entries.table';
+import { tags } from '../tags/tags.table';
 
 export const entryTags = pgTable(
   'entry_tags',

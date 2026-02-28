@@ -6,7 +6,7 @@ const envSchema = z.object({
   DATABASE_URL: z.string().url(),
   BETTER_AUTH_SECRET: z.string().min(32),
   BETTER_AUTH_URL: z.string().url().optional(),
-  CLIENT_URL: z.string().url().default('http://localhost:5173'),
+  CLIENT_URL: z.string().url().default('http://localhost:5174'),
 
   // GitHub OAuth
   GITHUB_CLIENT_ID: z.string().optional(),

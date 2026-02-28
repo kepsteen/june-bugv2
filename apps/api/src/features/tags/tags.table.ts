@@ -8,8 +8,8 @@ import {
   uniqueIndex,
   index,
 } from 'drizzle-orm/pg-core';
-import { appUsers } from '../app-users/app-users.table.js';
-import { entryTags } from '../entry-tags/entry-tags.table.js';
+import { appUsers } from '../app-users/app-users.table';
+import { entryTags } from '../entry-tags/entry-tags.table';
 
 export const tags = pgTable(
   'tags',

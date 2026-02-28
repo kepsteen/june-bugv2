@@ -43,7 +43,10 @@
       "Bash(pnpm exec tsx:*)",
       "Bash(pnpm exec drizzle-kit push:*)",
       "Bash(npx vite build 2>&1 | tail -20)",
-      "Bash(npx vite build 2>&1 | tail -10)"
+      "Bash(npx vite build 2>&1 | tail -10)",
+      "mcp__Neon__list_projects",
+      "WebFetch(domain:www.better-auth.com)",
+      "Bash(lsof -i :3000 2>&1)"
     ]
   }
 }

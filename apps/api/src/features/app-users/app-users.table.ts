@@ -9,10 +9,10 @@ import {
   jsonb,
   pgEnum,
 } from 'drizzle-orm/pg-core';
-import { user } from '../auth/auth.table.js';
-import { entries } from '../entries/entries.table.js';
-import { tags } from '../tags/tags.table.js';
-import { todos } from '../todos/todos.table.js';
+import { user } from '../auth/auth.table';
+import { entries } from '../entries/entries.table';
+import { tags } from '../tags/tags.table';
+import { todos } from '../todos/todos.table';
 
 export const experienceLevelEnum = pgEnum('experience_level', [
   'Junior',

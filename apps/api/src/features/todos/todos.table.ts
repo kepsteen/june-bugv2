@@ -1,6 +1,6 @@
 import { relations } from 'drizzle-orm';
 import { pgTable, uuid, text, boolean, timestamp, index } from 'drizzle-orm/pg-core';
-import { appUsers } from '../app-users/app-users.table.js';
+import { appUsers } from '../app-users/app-users.table';
 
 export const todos = pgTable(
   'todos',
