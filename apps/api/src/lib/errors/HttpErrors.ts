@@ -26,3 +26,12 @@ export class ConflictError extends AppError {
     super(message, 409, true);
   }
 }
+
+/**
+ * Forbidden error for operations the user is not allowed to perform
+ */
+export class ForbiddenError extends AppError {
+  constructor(message: string = 'Forbidden') {
+    super(message, 403, true);
+  }
+}

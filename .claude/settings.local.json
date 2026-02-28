@@ -41,7 +41,9 @@
       "Bash(pnpm test:*)",
       "Bash(node --input-type=module -e:*)",
       "Bash(pnpm exec tsx:*)",
-      "Bash(pnpm exec drizzle-kit push:*)"
+      "Bash(pnpm exec drizzle-kit push:*)",
+      "Bash(npx vite build 2>&1 | tail -20)",
+      "Bash(npx vite build 2>&1 | tail -10)"
     ]
   }
 }

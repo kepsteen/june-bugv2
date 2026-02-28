@@ -11,44 +11,29 @@ import {
 } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { signUp, signIn } from '@/lib/auth-client';
+import { signIn } from '@/lib/auth-client';
 import { Github } from 'lucide-react';
 
-export function SignUpPage() {
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
+export function SignInPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isGithubLoading, setIsGithubLoading] = useState(false);
   const navigate = useNavigate();
 
-  const handleSignUp = async (e: React.FormEvent) => {
+  const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-
-    if (password !== confirmPassword) {
-      setError('Passwords do not match');
-      return;
-    }
-
-    if (password.length < 8) {
-      setError('Password must be at least 8 characters');
-      return;
-    }
-
     setIsLoading(true);
 
     try {
-      const name = `${firstName.trim()} ${lastName.trim()}`.trim();
-      const result = await signUp.email({ email, password, name });
+      const result = await signIn.email({ email, password });
 
       if (result.error) {
-        setError(result.error.message || 'Sign up failed');
+        setError(result.error.message || 'Sign in failed');
       } else {
-        navigate('/onboarding');
+        navigate('/entries');
       }
     } catch {
       setError('An unexpected error occurred');
@@ -57,14 +42,14 @@ export function SignUpPage() {
     }
   };
 
-  const handleGithubSignUp = async () => {
+  const handleGithubSignIn = async () => {
     setError('');
     setIsGithubLoading(true);
 
     try {
       await signIn.social({ provider: 'github' });
     } catch {
-      setError('GitHub sign up failed');
+      setError('GitHub sign in failed');
       setIsGithubLoading(false);
     }
   };
@@ -74,41 +59,14 @@ export function SignUpPage() {
       <div className="w-full max-w-md space-y-4">
         <Card>
           <CardHeader className="space-y-1">
-            <CardTitle className="text-2xl font-bold">Sign Up</CardTitle>
+            <CardTitle className="text-2xl font-bold">Sign In</CardTitle>
             <CardDescription>
-              Enter your information to create an account.
+              Enter your email below to login to your account.
             </CardDescription>
           </CardHeader>
 
           <CardContent className="space-y-4">
-            <form onSubmit={handleSignUp} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="firstName">First name</Label>
-                  <Input
-                    id="firstName"
-                    type="text"
-                    placeholder="John"
-                    value={firstName}
-                    onChange={(e) => setFirstName(e.target.value)}
-                    required
-                    autoComplete="given-name"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="lastName">Last name</Label>
-                  <Input
-                    id="lastName"
-                    type="text"
-                    placeholder="Doe"
-                    value={lastName}
-                    onChange={(e) => setLastName(e.target.value)}
-                    required
-                    autoComplete="family-name"
-                  />
-                </div>
-              </div>
-
+            <form onSubmit={handleSignIn} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
                 <Input
@@ -123,28 +81,22 @@ export function SignUpPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="password">Password</Label>
+                  <Link
+                    to="/reset-password"
+                    className="text-sm text-muted-foreground underline-offset-4 hover:underline"
+                  >
+                    Forgot your password?
+                  </Link>
+                </div>
                 <Input
                   id="password"
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  autoComplete="new-password"
-                  minLength={8}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="confirmPassword">Confirm Password</Label>
-                <Input
-                  id="confirmPassword"
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  required
-                  autoComplete="new-password"
-                  minLength={8}
+                  autoComplete="current-password"
                 />
               </div>
 
@@ -153,7 +105,7 @@ export function SignUpPage() {
               )}
 
               <Button type="submit" className="w-full" disabled={isLoading || isGithubLoading}>
-                {isLoading ? 'Creating account...' : 'Create an account'}
+                {isLoading ? 'Signing in...' : 'Sign in with Password'}
               </Button>
             </form>
 
@@ -169,26 +121,30 @@ export function SignUpPage() {
             <Button
               variant="outline"
               className="w-full"
-              onClick={handleGithubSignUp}
+              onClick={handleGithubSignIn}
               disabled={isLoading || isGithubLoading}
             >
               <Github className="mr-2 h-4 w-4" />
-              {isGithubLoading ? 'Redirecting...' : 'Sign up with Github'}
+              {isGithubLoading ? 'Redirecting...' : 'Sign in with Github'}
             </Button>
           </CardContent>
 
           <CardFooter>
-            <p className="text-sm text-muted-foreground text-center w-full">
-              Already have an account?{' '}
-              <Link
-                to="/sign-in"
-                className="font-medium text-foreground underline-offset-4 hover:underline"
-              >
-                Sign in
-              </Link>
+            <p className="text-xs text-muted-foreground text-center w-full">
+              Powered by better-auth.
             </p>
           </CardFooter>
         </Card>
+
+        <p className="text-center text-sm text-muted-foreground">
+          Don&apos;t have an account?{' '}
+          <Link
+            to="/sign-up"
+            className="font-medium text-foreground underline-offset-4 hover:underline"
+          >
+            Sign up
+          </Link>
+        </p>
       </div>
     </div>
   );

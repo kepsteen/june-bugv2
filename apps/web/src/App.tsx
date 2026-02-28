@@ -1,34 +1,68 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { LoginPage } from '@/pages/LoginPage';
+import { useSession } from '@/lib/auth-client';
+import { EntriesPage } from '@/pages/EntriesPage';
+import { SignInPage } from '@/pages/SignInPage';
 import { SignUpPage } from '@/pages/SignUpPage';
-import { DashboardPage } from '@/pages/DashboardPage';
-import { useAuth } from '@/hooks/useAuth';
+import { SettingsPage } from '@/pages/SettingsPage';
+import { OnboardingPage } from '@/pages/OnboardingPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { data: session, isPending } = useSession();
 
-  if (isLoading) {
-    return <div>Loading...</div>;
+  if (isPending) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="text-muted-foreground text-sm">Loading...</div>
+      </div>
+    );
   }
 
-  return isAuthenticated ? <>{children}</> : <Navigate to="/login" />;
+  return session ? <>{children}</> : <Navigate to="/sign-in" />;
+}
+
+function AuthRoute({ children }: { children: React.ReactNode }) {
+  const { data: session, isPending } = useSession();
+
+  if (isPending) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="text-muted-foreground text-sm">Loading...</div>
+      </div>
+    );
+  }
+
+  return session ? <Navigate to="/entries" /> : <>{children}</>;
 }
 
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/signup" element={<SignUpPage />} />
+        <Route path="/" element={<Navigate to="/entries" />} />
+        <Route path="/sign-in" element={<AuthRoute><SignInPage /></AuthRoute>} />
+        <Route path="/sign-up" element={<AuthRoute><SignUpPage /></AuthRoute>} />
+        <Route path="/entries" element={<EntriesPage />} />
+        <Route path="/entries/:entryId" element={<EntriesPage />} />
         <Route
-          path="/dashboard"
+          path="/onboarding"
           element={
             <ProtectedRoute>
-              <DashboardPage />
+              <OnboardingPage />
             </ProtectedRoute>
           }
         />
-        <Route path="/" element={<Navigate to="/dashboard" />} />
+        <Route
+          path="/settings"
+          element={
+            <ProtectedRoute>
+              <SettingsPage />
+            </ProtectedRoute>
+          }
+        />
+        {/* Legacy routes */}
+        <Route path="/login" element={<Navigate to="/sign-in" />} />
+        <Route path="/signup" element={<Navigate to="/sign-up" />} />
+        <Route path="/dashboard" element={<Navigate to="/entries" />} />
       </Routes>
     </BrowserRouter>
   );

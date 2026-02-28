@@ -4,33 +4,38 @@ import 'dotenv/config';
 import { env } from './config/env.js';
 import { corsConfig } from './config/cors.js';
 import { errorHandler } from './middleware/error-middleware.js';
-import { userRoutes } from './features/users/index.js';
 import { toNodeHandler } from 'better-auth/node';
 import { auth } from './features/auth/auth.js';
+import { userRoutes } from './features/users/index.js';
+import { appUsersRoutes } from './features/app-users/index.js';
+import { entriesRoutes } from './features/entries/index.js';
+import { tagsRoutes } from './features/tags/index.js';
+import { entryTagsRouter, tagEntriesRouter } from './features/entry-tags/index.js';
+import { todosRoutes } from './features/todos/index.js';
+import { uploadsRoutes } from './features/uploads/index.js';
 
 const app = express();
 
-// CORS configuration
 app.use(cors(corsConfig));
-
-// Better Auth routes - IMPORTANT: Must be before express.json()
 app.all('/api/auth/*', toNodeHandler(auth));
-
-// Body parsing middleware - AFTER Better Auth routes
 app.use(express.json());
 
-// Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Feature routes
 app.use('/api/users', userRoutes);
+app.use('/api/app-users', appUsersRoutes);
+app.use('/api/entries', entriesRoutes);
+app.use('/api/tags', tagsRoutes);
+app.use('/api/entries/:entryId/tags', entryTagsRouter);
+app.use('/api/tags/:tagId/entries', tagEntriesRouter);
+app.use('/api/todos', todosRoutes);
+app.use('/api/uploads', uploadsRoutes);
 
-// Error handling
 app.use(errorHandler);
 
 app.listen(env.PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${env.PORT}`);
-  console.log(`📊 Environment: ${env.NODE_ENV}`);
+  console.log(`Server running on http://localhost:${env.PORT}`);
+  console.log(`Environment: ${env.NODE_ENV}`);
 });
