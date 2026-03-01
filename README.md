@@ -130,6 +130,14 @@ cd apps/web
 pnpm dlx shadcn@latest add [component-name]
 ```
 
+## Roadmap
+
+- AI-generated prompts that learn from you
+- Voice input
+- Export all notes as markdown
+- Mobile app
+- Weekly / monthly reflections
+
 ## License
 
 MIT
