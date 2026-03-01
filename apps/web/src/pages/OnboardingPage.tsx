@@ -399,17 +399,19 @@ export function OnboardingPage() {
             : (techStackRaw as string[]);
 
           completeOnboardingMutation.mutate({
-            fullName: newAnswers['fullName'] as string,
-            age: newAnswers['age'] ? Number(newAnswers['age']) : undefined,
-            currentRole: newAnswers['currentRole'] as string,
-            experienceLevel: newAnswers['experienceLevel'] as string,
-            mentorshipStyle: newAnswers['mentorshipStyle'] as string,
-            developmentGoals: newAnswers['developmentGoals'] as string[],
-            techStack,
-            workEnvironment: newAnswers['workEnvironment'] as string,
-            journalingFrequency: newAnswers['journalingFrequency'] as string,
-            journalingTime: newAnswers['journalingTime'] as string,
-            notificationPreferences: newAnswers['notificationPreferences'] as string[],
+            payload: {
+              fullName: newAnswers['fullName'] as string,
+              age: newAnswers['age'] ? Number(newAnswers['age']) : undefined,
+              currentRole: newAnswers['currentRole'] as string,
+              experienceLevel: newAnswers['experienceLevel'] as string,
+              mentorshipStyle: newAnswers['mentorshipStyle'] as string,
+              developmentGoals: newAnswers['developmentGoals'] as string[],
+              techStack,
+              workEnvironment: newAnswers['workEnvironment'] as string,
+              journalingFrequency: newAnswers['journalingFrequency'] as string,
+              journalingTime: newAnswers['journalingTime'] as string,
+              notificationPreferences: newAnswers['notificationPreferences'] as string[],
+            },
           });
         }, 1000);
     }

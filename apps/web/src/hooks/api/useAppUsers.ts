@@ -26,20 +26,21 @@ export function useGetOnboardingStatusQuery(options?: { enabled?: boolean }) {
 }
 
 type CompleteOnboardingResponse = { data: AppUser };
+type CompleteOnboardingVariables = { payload: Partial<AppUser> };
 
 /**
  * Mutation hook to complete onboarding
  * Automatically invalidates app user queries on success
  */
 export function useCompleteOnboardingMutation(
-  options?: Omit<UseMutationOptions<CompleteOnboardingResponse, Error, Partial<AppUser>, unknown>, 'mutationFn'>
+  options?: Omit<UseMutationOptions<CompleteOnboardingResponse, Error, CompleteOnboardingVariables, unknown>, 'mutationFn'>
 ) {
   const queryClient = useQueryClient();
   const { onSuccess, ...restOptions } = options || {};
 
   return useMutation({
     ...restOptions,
-    mutationFn: (data: Partial<AppUser>) => appUsersApi.completeOnboarding(data),
+    mutationFn: (variables: CompleteOnboardingVariables) => appUsersApi.completeOnboarding(variables),
     onSuccess: (...args) => {
       queryClient.invalidateQueries({ queryKey: ['appUser'] });
       queryClient.invalidateQueries({ queryKey: ['appUser', 'onboarding'] });

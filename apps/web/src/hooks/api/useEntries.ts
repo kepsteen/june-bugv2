@@ -4,10 +4,10 @@ import { entriesApi, type Entry } from '@/lib/api';
 /**
  * Query hook to get all entries
  */
-export function useGetAllEntriesQuery(options?: { includeInactive?: boolean; enabled?: boolean }) {
+export function useGetAllEntriesQuery(options?: { enabled?: boolean }) {
   return useQuery({
-    queryKey: ['entries', options?.includeInactive],
-    queryFn: () => entriesApi.list(options?.includeInactive),
+    queryKey: ['entries'],
+    queryFn: () => entriesApi.list(),
     enabled: options?.enabled !== false,
     staleTime: 30_000,
   });
@@ -50,22 +50,46 @@ export function useGetEntriesByRangeQuery(start: string, end: string, options?: 
 }
 
 type CreateEntryResponse = { data: Entry };
-type UpdateEntryVariables = { id: string; data: Partial<Entry> };
+type CreateEntryVariables = { entryDate?: string };
+type UpdateEntryVariables = { id: string; payload: Partial<Entry> };
 type UpdateEntryResponse = { data: Entry };
+type CreateTitleVariables = { id: string; payload: { content: string } };
 
 /**
  * Mutation hook to create a new entry
  * Automatically invalidates the entries list on success
  */
 export function useCreateEntryMutation(
-  options?: Omit<UseMutationOptions<CreateEntryResponse, Error, string | undefined, unknown>, 'mutationFn'>
+  options?: Omit<UseMutationOptions<CreateEntryResponse, Error, CreateEntryVariables, unknown>, 'mutationFn'>
 ) {
   const queryClient = useQueryClient();
   const { onSuccess, ...restOptions } = options || {};
 
   return useMutation({
     ...restOptions,
-    mutationFn: (entryDate?: string) => entriesApi.create(entryDate),
+    mutationFn: (variables: CreateEntryVariables) => entriesApi.create({ payload: variables }),
+    onSuccess: (...args) => {
+      queryClient.invalidateQueries({ queryKey: ['entries'] });
+      if (onSuccess) {
+        onSuccess(...args);
+      }
+    },
+  });
+}
+
+/**
+ * Mutation hook to create an entry title
+ * Automatically invalidates the entries list on success
+ */
+export function useCreateEntryTitleMutation(
+  options?: Omit<UseMutationOptions<CreateEntryResponse, Error, CreateTitleVariables, unknown>, 'mutationFn'>
+) {
+  const queryClient = useQueryClient();
+  const { onSuccess, ...restOptions } = options || {};
+
+  return useMutation({
+    ...restOptions,
+    mutationFn: (variables: CreateTitleVariables) => entriesApi.createTitle(variables),
     onSuccess: (...args) => {
       queryClient.invalidateQueries({ queryKey: ['entries'] });
       if (onSuccess) {
@@ -87,8 +111,7 @@ export function useUpdateEntryMutation(
 
   return useMutation({
     ...restOptions,
-    mutationFn: ({ id, data }: UpdateEntryVariables) =>
-      entriesApi.update(id, data),
+    mutationFn: (variables: UpdateEntryVariables) => entriesApi.update(variables),
     onSuccess: (data, variables, ...rest) => {
       queryClient.invalidateQueries({ queryKey: ['entries'] });
       queryClient.setQueryData(['entry', variables.id], data);
@@ -100,10 +123,10 @@ export function useUpdateEntryMutation(
 }
 
 /**
- * Mutation hook to soft delete an entry
+ * Mutation hook to delete an entry
  * Automatically invalidates the entries list on success
  */
-export function useSoftDeleteEntryMutation(
+export function useDeleteEntryMutation(
   options?: Omit<UseMutationOptions<void, Error, string, unknown>, 'mutationFn'>
 ) {
   const queryClient = useQueryClient();
@@ -111,29 +134,7 @@ export function useSoftDeleteEntryMutation(
 
   return useMutation({
     ...restOptions,
-    mutationFn: (id: string) => entriesApi.softDelete(id),
-    onSuccess: (...args) => {
-      queryClient.invalidateQueries({ queryKey: ['entries'] });
-      if (onSuccess) {
-        onSuccess(...args);
-      }
-    },
-  });
-}
-
-/**
- * Mutation hook to permanently delete an entry
- * Automatically invalidates the entries list on success
- */
-export function usePermanentDeleteEntryMutation(
-  options?: Omit<UseMutationOptions<void, Error, string, unknown>, 'mutationFn'>
-) {
-  const queryClient = useQueryClient();
-  const { onSuccess, ...restOptions } = options || {};
-
-  return useMutation({
-    ...restOptions,
-    mutationFn: (id: string) => entriesApi.permanentDelete(id),
+    mutationFn: (id: string) => entriesApi.delete(id),
     onSuccess: (...args) => {
       queryClient.invalidateQueries({ queryKey: ['entries'] });
       if (onSuccess) {

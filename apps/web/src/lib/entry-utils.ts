@@ -53,14 +53,14 @@ export function filterEntriesBySearch(entries: Entry[], searchTerm: string): Ent
   if (!searchTerm.trim()) return entries;
   const lower = searchTerm.toLowerCase().trim();
   return entries.filter((entry) => {
-    const title = (entry.aiTitle || formatEntryDate(entry.entryDate)).toLowerCase();
+    const title = (entry.Title || formatEntryDate(entry.entryDate)).toLowerCase();
     const text = (entry.plainText || '').toLowerCase();
     return title.includes(lower) || text.includes(lower);
   });
 }
 
 export function getEntryDisplayTitle(entry: Entry): string {
-  return entry.aiTitle || formatEntryDate(entry.entryDate);
+  return entry.Title || formatEntryDate(entry.entryDate);
 }
 
 export function countWords(text: string): number {

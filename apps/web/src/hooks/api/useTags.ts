@@ -27,10 +27,11 @@ export function useGetEntryTagsQuery(entryId: string, options?: { enabled?: bool
 
 type CreateTagVariables = { name: string; emoji?: string; color?: string };
 type CreateTagResponse = { data: Tag };
-type UpdateTagVariables = { id: string; data: Partial<Tag> };
+type UpdateTagVariables = { id: string; payload: Partial<Tag> };
 type UpdateTagResponse = { data: Tag };
-type TagEntryVariables = { entryId: string; tagId: string };
-type SetEntryTagsVariables = { entryId: string; tagIds: string[] };
+type TagEntryVariables = { entryId: string; payload: { tagId: string } };
+type RemoveTagVariables = { entryId: string; tagId: string };
+type SetEntryTagsVariables = { entryId: string; payload: { tagIds: string[] } };
 
 /**
  * Mutation hook to create a tag
@@ -44,7 +45,7 @@ export function useCreateTagMutation(
 
   return useMutation({
     ...restOptions,
-    mutationFn: (data: CreateTagVariables) => tagsApi.create(data),
+    mutationFn: (variables: CreateTagVariables) => tagsApi.create({ payload: variables }),
     onSuccess: (...args) => {
       queryClient.invalidateQueries({ queryKey: ['tags'] });
       if (onSuccess) {
@@ -66,7 +67,7 @@ export function useUpdateTagMutation(
 
   return useMutation({
     ...restOptions,
-    mutationFn: ({ id, data }: UpdateTagVariables) => tagsApi.update(id, data),
+    mutationFn: (variables: UpdateTagVariables) => tagsApi.update(variables),
     onSuccess: (...args) => {
       queryClient.invalidateQueries({ queryKey: ['tags'] });
       if (onSuccess) {
@@ -77,10 +78,10 @@ export function useUpdateTagMutation(
 }
 
 /**
- * Mutation hook to soft delete a tag
+ * Mutation hook to delete a tag
  * Automatically invalidates tags list on success
  */
-export function useSoftDeleteTagMutation(
+export function useDeleteTagMutation(
   options?: Omit<UseMutationOptions<void, Error, string, unknown>, 'mutationFn'>
 ) {
   const queryClient = useQueryClient();
@@ -88,7 +89,7 @@ export function useSoftDeleteTagMutation(
 
   return useMutation({
     ...restOptions,
-    mutationFn: (id: string) => tagsApi.softDelete(id),
+    mutationFn: (id: string) => tagsApi.delete(id),
     onSuccess: (...args) => {
       queryClient.invalidateQueries({ queryKey: ['tags'] });
       if (onSuccess) {
@@ -110,8 +111,7 @@ export function useAddTagToEntryMutation(
 
   return useMutation({
     ...restOptions,
-    mutationFn: ({ entryId, tagId }: TagEntryVariables) =>
-      tagsApi.addTag(entryId, tagId),
+    mutationFn: (variables: TagEntryVariables) => tagsApi.addTag(variables),
     onSuccess: (data, variables, ...rest) => {
       queryClient.invalidateQueries({ queryKey: ['entries', variables.entryId, 'tags'] });
       queryClient.invalidateQueries({ queryKey: ['tags'] });
@@ -127,15 +127,14 @@ export function useAddTagToEntryMutation(
  * Automatically invalidates entry tags and tags list on success
  */
 export function useRemoveTagFromEntryMutation(
-  options?: Omit<UseMutationOptions<void, Error, TagEntryVariables, unknown>, 'mutationFn'>
+  options?: Omit<UseMutationOptions<void, Error, RemoveTagVariables, unknown>, 'mutationFn'>
 ) {
   const queryClient = useQueryClient();
   const { onSuccess, ...restOptions } = options || {};
 
   return useMutation({
     ...restOptions,
-    mutationFn: ({ entryId, tagId }: TagEntryVariables) =>
-      tagsApi.removeTag(entryId, tagId),
+    mutationFn: (variables: RemoveTagVariables) => tagsApi.removeTag(variables),
     onSuccess: (data, variables, ...rest) => {
       queryClient.invalidateQueries({ queryKey: ['entries', variables.entryId, 'tags'] });
       queryClient.invalidateQueries({ queryKey: ['tags'] });
@@ -158,8 +157,7 @@ export function useSetEntryTagsMutation(
 
   return useMutation({
     ...restOptions,
-    mutationFn: ({ entryId, tagIds }: SetEntryTagsVariables) =>
-      tagsApi.setTags(entryId, tagIds),
+    mutationFn: (variables: SetEntryTagsVariables) => tagsApi.setTags(variables),
     onSuccess: (data, variables, ...rest) => {
       queryClient.invalidateQueries({ queryKey: ['entries', variables.entryId, 'tags'] });
       queryClient.invalidateQueries({ queryKey: ['tags'] });

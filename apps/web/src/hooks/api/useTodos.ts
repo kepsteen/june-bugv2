@@ -14,6 +14,7 @@ export function useGetAllTodosQuery(options?: { enabled?: boolean }) {
 }
 
 type CreateTodoResponse = { data: Todo };
+type CreateTodoVariables = { text: string };
 type ToggleTodoResponse = { data: Todo };
 
 /**
@@ -21,14 +22,14 @@ type ToggleTodoResponse = { data: Todo };
  * Automatically invalidates todos list on success
  */
 export function useCreateTodoMutation(
-  options?: Omit<UseMutationOptions<CreateTodoResponse, Error, string, unknown>, 'mutationFn'>
+  options?: Omit<UseMutationOptions<CreateTodoResponse, Error, CreateTodoVariables, unknown>, 'mutationFn'>
 ) {
   const queryClient = useQueryClient();
   const { onSuccess, ...restOptions } = options || {};
 
   return useMutation({
     ...restOptions,
-    mutationFn: (text: string) => todosApi.create(text),
+    mutationFn: (variables: CreateTodoVariables) => todosApi.create({ payload: variables }),
     onSuccess: (...args) => {
       queryClient.invalidateQueries({ queryKey: ['todos'] });
       if (onSuccess) {

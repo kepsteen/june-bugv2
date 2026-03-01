@@ -5,9 +5,9 @@ export {
   useSearchEntriesQuery,
   useGetEntriesByRangeQuery,
   useCreateEntryMutation,
+  useCreateEntryTitleMutation,
   useUpdateEntryMutation,
-  useSoftDeleteEntryMutation,
-  usePermanentDeleteEntryMutation,
+  useDeleteEntryMutation,
 } from './useEntries';
 
 // App Users hooks
@@ -23,7 +23,7 @@ export {
   useGetEntryTagsQuery,
   useCreateTagMutation,
   useUpdateTagMutation,
-  useSoftDeleteTagMutation,
+  useDeleteTagMutation,
   useAddTagToEntryMutation,
   useRemoveTagFromEntryMutation,
   useSetEntryTagsMutation,

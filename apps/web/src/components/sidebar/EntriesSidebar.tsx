@@ -2,7 +2,19 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Search, User, LogIn } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { Plus, Search, User, LogIn, MoreHorizontal, Trash2 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { groupEntriesByDate, getEntryDisplayTitle, formatEntryDateShort, filterEntriesBySearch } from '@/lib/entry-utils';
 import type { Entry } from '@/lib/api';
@@ -12,6 +24,7 @@ interface EntriesSidebarProps {
   selectedEntryId?: string;
   onSelectEntry: (entryId: string) => void;
   onNewEntry: () => void;
+  onDeleteEntry: (entryId: string) => void;
   searchTerm: string;
   onSearchChange: (term: string) => void;
   sidebarRef: React.RefObject<HTMLElement | null>;
@@ -26,6 +39,7 @@ export function EntriesSidebar({
   selectedEntryId,
   onSelectEntry,
   onNewEntry,
+  onDeleteEntry,
   searchTerm,
   onSearchChange,
   sidebarRef,
@@ -39,23 +53,63 @@ export function EntriesSidebar({
   const filteredEntries = filterEntriesBySearch(entries, searchTerm);
   const groupedEntries = groupEntriesByDate(filteredEntries);
 
+  const handleDelete = (e: React.MouseEvent, entryId: string) => {
+    e.stopPropagation();
+    onDeleteEntry(entryId);
+  };
+
   const renderEntryButton = (entry: Entry) => {
     const isSelected = entry.id === selectedEntryId;
     const displayText = getEntryDisplayTitle(entry);
 
     return (
-      <button
+      <div
         key={entry.id}
-        onClick={() => onSelectEntry(entry.id)}
-        className={`w-full text-left px-3 py-2 rounded-md transition-colors ${
+        className={`group relative flex items-center gap-2 px-3 py-2 rounded-md transition-colors ${
           isSelected ? 'bg-accent text-accent-foreground' : 'hover:bg-accent/50'
         }`}
       >
-        <div className="text-sm font-medium truncate">{displayText}</div>
-        <div className="text-xs text-muted-foreground truncate">
-          {formatEntryDateShort(entry.entryDate)}
-        </div>
-      </button>
+        <TooltipProvider delayDuration={700}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={() => onSelectEntry(entry.id)}
+                className="flex-1 text-left min-w-0"
+              >
+                <div className="text-xs font-medium truncate">{displayText}</div>
+                <div className="text-[0.625rem] text-muted-foreground truncate">
+                  {formatEntryDateShort(entry.entryDate)}
+                </div>
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="max-w-xs -mt-4">
+              <p className="text-xs">{displayText}</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+        
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 opacity-0 group-hover:opacity-100 focus:opacity-100 data-[state=open]:opacity-100 transition-opacity shrink-0 focus-visible:ring-0 focus-visible:ring-offset-0"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem
+              className="text-destructive focus:text-destructive"
+              onClick={(e) => handleDelete(e, entry.id)}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
     );
   };
 
@@ -122,7 +176,7 @@ export function EntriesSidebar({
           )}
         </div>
 
-        <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-sidebar via-sidebar/80 to-transparent pointer-events-none" />
+        <div className="absolute bottom-0 left-0 right-0 h-16 bg-linear-to-t from-sidebar via-sidebar/80 to-transparent pointer-events-none" />
       </div>
 
       <div className="mt-3 bg-sidebar">

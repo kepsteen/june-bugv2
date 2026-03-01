@@ -8,12 +8,14 @@ import { EntriesSidebar } from '@/components/sidebar/EntriesSidebar';
 import { PromptsSidebar } from '@/components/sidebar/PromptsSidebar';
 import { TiptapEditor } from '@/components/editor/TiptapEditor';
 import { SearchDialog } from '@/components/SearchDialog';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import {
   useGetAllEntriesQuery,
   useGetEntryByIdQuery,
   useCreateEntryMutation,
   useUpdateEntryMutation,
+  useDeleteEntryMutation,
 } from '@/hooks/api';
 import { useGetCurrentAppUserQuery } from '@/hooks/api';
 import { useSession } from '@/lib/auth-client';
@@ -33,6 +35,8 @@ export function EntriesPage() {
   const [savedTime, setSavedTime] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [wiggle, setWiggle] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [entryToDelete, setEntryToDelete] = useState<string | null>(null);
   const sidebarRef = useRef<HTMLElement | null>(null);
   const isAuthenticated = !!session?.user;
 
@@ -70,32 +74,75 @@ export function EntriesPage() {
     onError: () => setIsSaving(false),
   });
 
-  // Debounced save
-  const [pendingContent, setPendingContent] = useState<{ content: string; plainText: string } | null>(null);
+  // Debounced save - track which entry the pending content belongs to
+  const [pendingContent, setPendingContent] = useState<{ content: string; plainText: string; entryId: string | undefined } | null>(null);
   const [debouncedPending] = useDebounce(pendingContent, 1000, { maxWait: 2000 });
+  const currentEntryIdRef = useRef(entryId);
+
+  // Keep ref in sync with current entryId
+  useEffect(() => {
+    currentEntryIdRef.current = entryId;
+  }, [entryId]);
 
   useEffect(() => {
-    if (debouncedPending && entryId) {
-      updateMutation.mutate({ id: entryId, data: debouncedPending });
+    const belongsToCurrentEntry = debouncedPending && debouncedPending.entryId === currentEntryIdRef.current;
+    // Only save if the debounced content belongs to the current entry
+    if (belongsToCurrentEntry && entryId) {
+      const { entryId: _, ...payload } = debouncedPending;
+      updateMutation.mutate({ id: entryId, payload });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- mutate is stable, including updateMutation causes infinite loop
   }, [debouncedPending, entryId]);
 
   const handleEditorUpdate = useCallback((content: string, plainText: string) => {
+    const currentId = currentEntryIdRef.current;
     setIsSaving(true);
-    setPendingContent({ content, plainText });
+    // Store the entryId with the content so we can verify it later
+    setPendingContent({ content, plainText, entryId: currentId });
   }, []);
 
   // Create new entry with navigation on success
-  const createMutation = useCreateEntryMutation({
+  const createEntryMutation = useCreateEntryMutation({
     onSuccess: (data) => {
       navigate(`/entries/${data.data.id}`);
     },
+    onError: (error) => {
+      console.error('Failed to create entry:', error);
+    },
   });
 
-  const handleNewEntry = () => createMutation.mutate(undefined);
+  const handleNewEntry = () => {
+    createEntryMutation.mutate({});
+  };
 
   const handleSelectEntry = (id: string) => navigate(`/entries/${id}`);
+
+  // Delete entry mutation with navigation on success
+  const deleteEntryMutation = useDeleteEntryMutation({
+    onSuccess: (_, deletedId) => {
+      // If we deleted the currently viewed entry, navigate to the first available entry or home
+      if (entryId === deletedId) {
+        const remainingEntries = entries.filter(e => e.id !== deletedId);
+        if (remainingEntries.length > 0) {
+          navigate(`/entries/${remainingEntries[0].id}`, { replace: true });
+        } else {
+          navigate('/entries', { replace: true });
+        }
+      }
+    },
+  });
+
+  const handleDeleteEntry = (id: string) => {
+    setEntryToDelete(id);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = () => {
+    if (entryToDelete) {
+      deleteEntryMutation.mutate(entryToDelete);
+      setEntryToDelete(null);
+    }
+  };
 
   const handlePromptsToggle = () => {
     setPromptsOpen((prev) => {
@@ -123,13 +170,14 @@ export function EntriesPage() {
   });
 
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-background relative">
+    <div className="flex h-screen w-full overflow-hidden bg-sidebar relative">
       {/* Left Sidebar */}
       <EntriesSidebar
         entries={entries}
         selectedEntryId={entryId}
         onSelectEntry={handleSelectEntry}
         onNewEntry={handleNewEntry}
+        onDeleteEntry={handleDeleteEntry}
         searchTerm={searchTerm}
         onSearchChange={setSearchTerm}
         sidebarRef={sidebarRef}
@@ -138,11 +186,6 @@ export function EntriesPage() {
         isAuthenticated={isAuthenticated}
         user={session?.user ? { name: session.user.name, image: session.user.image } : null}
       />
-
-      {/* Resize handle */}
-      {!sidebarCollapsed && (
-        <div className="w-1 bg-border/50 hover:bg-primary/20 cursor-col-resize transition-colors" />
-      )}
 
       {/* Collapse button - sits at top-left of page over sidebar when open */}
       {!sidebarCollapsed && (
@@ -162,7 +205,7 @@ export function EntriesPage() {
           {/* Top border that stops before notch */}
           {!sidebarCollapsed && (
             <div
-              className="absolute top-0 left-0 right-0 h-[0.5px] bg-border transition-opacity duration-500 ease-in-out"
+              className="absolute top-0 left-0 right-0 h-[0.5px] bg-sidebar transition-opacity duration-500 ease-in-out"
               style={{ right: '65px', left: '8px' }}
             />
           )}
@@ -177,7 +220,7 @@ export function EntriesPage() {
               >
                 <path
                   d="M 96,0 L 0,0 C 20,0 32,9 32,24 C 32,39 44,48 64,48 L 96,48 Z"
-                  className="fill-background"
+                  className="fill-sidebar"
                 />
                 <path
                   d="M 0,0 C 20,0 32,9 32,24 C 32,39 44,48 64,48 L 96,48"
@@ -263,6 +306,7 @@ export function EntriesPage() {
             ) : currentEntry ? (
               <TiptapEditor
                 key={currentEntry.id}
+                entryId={currentEntry.id}
                 initialContent={currentEntry.content}
                 onUpdate={handleEditorUpdate}
               />
@@ -291,12 +335,12 @@ export function EntriesPage() {
       {isAuthenticated && (
         <button
           onClick={handlePromptsToggle}
-          className={`fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full border-2 border-border shadow-lg overflow-hidden bg-card hover:scale-105 transition-transform ${wiggle ? 'animate-happy-wiggle' : ''}`}
+          className={`p-2 bg-sidebar fixed bottom-6 right-6 z-50 w-18 h-18 rounded-full border-2 border-border shadow-lg overflow-hidden hover:scale-105 transition-transform ${wiggle ? 'animate-happy-wiggle' : ''}`}
           aria-label="Open entry prompts"
           style={{ right: promptsOpen ? 'calc(320px + 1.5rem)' : '1.5rem' }}
         >
           <img
-            src="/apple-touch-icon-180x180.png"
+            src="/june-bug-logo.png"
             alt="JuneBug"
             className="w-full h-full object-cover"
           />
@@ -308,6 +352,18 @@ export function EntriesPage() {
         open={searchOpen}
         onOpenChange={setSearchOpen}
         entries={entries}
+      />
+
+      {/* Delete confirmation dialog */}
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        title="Delete Entry"
+        description="Are you sure you want to permanently delete this entry? This action cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="destructive"
+        onConfirm={handleConfirmDelete}
       />
     </div>
   );

@@ -26,34 +26,34 @@ export const appUsersApi = {
     request<{ data: { isOnboarded: boolean; user: AppUser | null } }>(
       '/api/app-users/onboarding/status',
     ),
-  completeOnboarding: (data: Partial<AppUser>) =>
+  completeOnboarding: (data: { payload: Partial<AppUser> }) =>
     request<{ data: AppUser }>('/api/app-users/onboarding', {
       method: 'PUT',
-      body: JSON.stringify(data),
+      body: JSON.stringify(data.payload),
     }),
 };
 
 // Entries
 export const entriesApi = {
-  list: (includeInactive?: boolean) =>
-    request<{ data: Entry[] }>(
-      `/api/entries${includeInactive ? '?includeInactive=true' : ''}`,
-    ),
+  list: () => request<{ data: Entry[] }>('/api/entries'),
   get: (id: string) => request<{ data: Entry }>(`/api/entries/${id}`),
-  create: (entryDate?: string) =>
+  create: (data: { payload: { entryDate?: string } }) =>
     request<{ data: Entry }>('/api/entries', {
       method: 'POST',
-      body: JSON.stringify({ entryDate }),
+      body: JSON.stringify(data.payload),
     }),
-  update: (id: string, data: Partial<Entry>) =>
-    request<{ data: Entry }>(`/api/entries/${id}`, {
+  createTitle: (data: { id: string; payload: { content: string } }) =>
+    request<{ data: Entry }>(`/api/entries/${data.id}/title`, {
+      method: 'POST',
+      body: JSON.stringify(data.payload),
+    }),
+  update: (data: { id: string; payload: Partial<Entry> }) =>
+    request<{ data: Entry }>(`/api/entries/${data.id}`, {
       method: 'PUT',
-      body: JSON.stringify(data),
+      body: JSON.stringify(data.payload),
     }),
-  softDelete: (id: string) =>
+  delete: (id: string) =>
     request<void>(`/api/entries/${id}`, { method: 'DELETE' }),
-  permanentDelete: (id: string) =>
-    request<void>(`/api/entries/${id}/permanent`, { method: 'DELETE' }),
   search: (q: string) =>
     request<{ data: Entry[] }>(`/api/entries/search?q=${encodeURIComponent(q)}`),
   getByRange: (start: string, end: string) =>
@@ -65,41 +65,41 @@ export const entriesApi = {
 // Tags
 export const tagsApi = {
   list: () => request<{ data: Tag[] }>('/api/tags'),
-  create: (data: { name: string; emoji?: string; color?: string }) =>
+  create: (data: { payload: { name: string; emoji?: string; color?: string } }) =>
     request<{ data: Tag }>('/api/tags', {
       method: 'POST',
-      body: JSON.stringify(data),
+      body: JSON.stringify(data.payload),
     }),
-  update: (id: string, data: Partial<Tag>) =>
-    request<{ data: Tag }>(`/api/tags/${id}`, {
+  update: (data: { id: string; payload: Partial<Tag> }) =>
+    request<{ data: Tag }>(`/api/tags/${data.id}`, {
       method: 'PUT',
-      body: JSON.stringify(data),
+      body: JSON.stringify(data.payload),
     }),
-  softDelete: (id: string) =>
+  delete: (id: string) =>
     request<void>(`/api/tags/${id}`, { method: 'DELETE' }),
   getEntryTags: (entryId: string) =>
     request<{ data: Tag[] }>(`/api/entries/${entryId}/tags`),
-  addTag: (entryId: string, tagId: string) =>
-    request<void>(`/api/entries/${entryId}/tags`, {
+  addTag: (data: { entryId: string; payload: { tagId: string } }) =>
+    request<void>(`/api/entries/${data.entryId}/tags`, {
       method: 'POST',
-      body: JSON.stringify({ tagId }),
+      body: JSON.stringify(data.payload),
     }),
-  removeTag: (entryId: string, tagId: string) =>
-    request<void>(`/api/entries/${entryId}/tags/${tagId}`, { method: 'DELETE' }),
-  setTags: (entryId: string, tagIds: string[]) =>
-    request<void>(`/api/entries/${entryId}/tags`, {
+  removeTag: (data: { entryId: string; tagId: string }) =>
+    request<void>(`/api/entries/${data.entryId}/tags/${data.tagId}`, { method: 'DELETE' }),
+  setTags: (data: { entryId: string; payload: { tagIds: string[] } }) =>
+    request<void>(`/api/entries/${data.entryId}/tags`, {
       method: 'PUT',
-      body: JSON.stringify({ tagIds }),
+      body: JSON.stringify(data.payload),
     }),
 };
 
 // Todos
 export const todosApi = {
   list: () => request<{ data: Todo[] }>('/api/todos'),
-  create: (text: string) =>
+  create: (data: { payload: { text: string } }) =>
     request<{ data: Todo }>('/api/todos', {
       method: 'POST',
-      body: JSON.stringify({ text }),
+      body: JSON.stringify(data.payload),
     }),
   toggle: (id: string) =>
     request<{ data: Todo }>(`/api/todos/${id}/toggle`, { method: 'PUT' }),
@@ -109,15 +109,15 @@ export const todosApi = {
 
 // Uploads
 export const uploadsApi = {
-  getPresignedUrl: (filename: string, contentType: string) =>
+  getPresignedUrl: (data: { payload: { filename: string; contentType: string } }) =>
     request<{ data: { url: string; key: string } }>('/api/uploads/presigned-url', {
       method: 'POST',
-      body: JSON.stringify({ filename, contentType }),
+      body: JSON.stringify(data.payload),
     }),
-  complete: (key: string) =>
+  complete: (data: { payload: { key: string } }) =>
     request<{ data: { publicUrl: string } }>('/api/uploads/complete', {
       method: 'POST',
-      body: JSON.stringify({ key }),
+      body: JSON.stringify(data.payload),
     }),
 };
 
@@ -149,8 +149,7 @@ export interface Entry {
   entryDate: string;
   content: string;
   plainText?: string;
-  aiTitle?: string;
-  isActive: boolean;
+  Title?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -162,7 +161,6 @@ export interface Tag {
   isSystemGenerated: boolean;
   emoji?: string;
   color?: string;
-  isActive: boolean;
   createdAt: string;
 }
 
