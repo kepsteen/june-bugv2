@@ -1,38 +1,29 @@
-import type { Response, NextFunction } from 'express';
+import type { Response } from 'express';
 import type { ValidatedRequest } from '../../lib/types/express.js';
 import type { UpdateUserInput } from './users.schema.js';
+import { asyncHandler } from '../../lib/async-handler.js';
 import { userService } from './users.service.js';
 
 export const userController = {
   /**
    * Get current authenticated user
    */
-  getCurrentUser: async (req: ValidatedRequest, res: Response, next: NextFunction) => {
-    try {
-
-      res.json({ user: res.locals.user });
-    } catch (error) {
-      next(error);
-    }
-  },
+  getCurrentUser: asyncHandler(async (req: ValidatedRequest, res: Response) => {
+    res.json({ user: res.locals.user });
+  }),
 
   /**
    * Update current authenticated user
    */
-  updateCurrentUser: async (
+  updateCurrentUser: asyncHandler(async (
     req: ValidatedRequest<UpdateUserInput>,
-    res: Response,
-    next: NextFunction
+    res: Response
   ) => {
-    try {
-      const { user } = res.locals.user;
+    const { user } = res.locals.user;
 
-      // Update user via service layer
-      const updatedUser = await userService.update(user.id, req.body);
+    // Update user via service layer
+    const updatedUser = await userService.update({ id: user.id, data: req.body });
 
-      res.json({ user: updatedUser });
-    } catch (error) {
-      next(error);
-    }
-  },
+    res.json({ user: updatedUser });
+  }),
 };

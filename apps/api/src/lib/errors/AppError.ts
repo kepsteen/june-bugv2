@@ -5,6 +5,21 @@
 export class AppError extends Error {
   public readonly statusCode: number;
   public readonly isOperational: boolean;
+  public context?: {
+    // HTTP Request context
+    method?: string;
+    path?: string;
+    params?: Record<string, any>;
+    query?: Record<string, any>;
+    userId?: string;
+    
+    // Service call context
+    service?: string;              // e.g., "entriesService"
+    serviceMethod?: string;         // e.g., "updateTitle"
+    serviceArgs?: any;              // Options object passed to the service method
+    
+    timestamp?: string;
+  };
 
   constructor(message: string, statusCode: number = 500, isOperational: boolean = true) {
     super(message);

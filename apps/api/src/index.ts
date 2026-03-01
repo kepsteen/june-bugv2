@@ -4,6 +4,7 @@ import 'dotenv/config';
 import { env } from './config/env.js';
 import { corsConfig } from './config/cors.js';
 import { errorHandler } from './middleware/error-middleware.js';
+import { requestLogger } from './middleware/request-logger.js';
 import { toNodeHandler } from 'better-auth/node';
 import { auth } from './features/auth/auth.js';
 import { userRoutes } from './features/users/index.js';
@@ -19,6 +20,7 @@ const app = express();
 app.use(cors(corsConfig));
 app.all('/api/auth/*', toNodeHandler(auth));
 app.use(express.json());
+app.use(requestLogger);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });

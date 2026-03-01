@@ -4,12 +4,13 @@ import { tags } from '../tags/tags.table.js';
 import { entries } from '../entries/entries.table.js';
 import { eq, and, inArray } from 'drizzle-orm';
 import { NotFoundError } from '@/lib/errors/index.js';
+import { wrapService } from '@/lib/service-wrapper.js';
 import type { Tag } from '../tags/tags.table.js';
 import type { Entry } from '../entries/entries.table.js';
 
-export const entryTagsService = {
+const entryTagsServiceRaw = {
   // Get tags for an entry (verify entry ownership, join with tags)
-  async getEntryTags(entryId: string, userId: string): Promise<Tag[]> {
+  async getEntryTags({ entryId, userId }: { entryId: string; userId: string }): Promise<Tag[]> {
     // Verify entry ownership
     const [entry] = await db.select().from(entries).where(
       and(eq(entries.id, entryId), eq(entries.userId, userId)),
@@ -26,7 +27,7 @@ export const entryTagsService = {
   },
 
   // Add a tag to an entry
-  async addTagToEntry(entryId: string, tagId: string, userId: string): Promise<void> {
+  async addTagToEntry({ entryId, tagId, userId }: { entryId: string; tagId: string; userId: string }): Promise<void> {
     // Verify entry ownership
     const [entry] = await db.select().from(entries).where(
       and(eq(entries.id, entryId), eq(entries.userId, userId)),
@@ -42,7 +43,7 @@ export const entryTagsService = {
   },
 
   // Remove a tag from an entry
-  async removeTagFromEntry(entryId: string, tagId: string, userId: string): Promise<void> {
+  async removeTagFromEntry({ entryId, tagId, userId }: { entryId: string; tagId: string; userId: string }): Promise<void> {
     // Verify entry ownership
     const [entry] = await db.select().from(entries).where(
       and(eq(entries.id, entryId), eq(entries.userId, userId)),
@@ -55,7 +56,7 @@ export const entryTagsService = {
   },
 
   // Bulk set tags (delete existing, insert new)
-  async setEntryTags(entryId: string, tagIds: string[], userId: string): Promise<void> {
+  async setEntryTags({ entryId, tagIds, userId }: { entryId: string; tagIds: string[]; userId: string }): Promise<void> {
     // Verify entry ownership
     const [entry] = await db.select().from(entries).where(
       and(eq(entries.id, entryId), eq(entries.userId, userId)),
@@ -74,7 +75,7 @@ export const entryTagsService = {
   },
 
   // Get entries with a specific tag
-  async getEntriesWithTag(tagId: string, userId: string): Promise<Entry[]> {
+  async getEntriesWithTag({ tagId, userId }: { tagId: string; userId: string }): Promise<Entry[]> {
     // Verify tag exists
     const [tag] = await db.select().from(tags).where(eq(tags.id, tagId));
     if (!tag) throw new NotFoundError('Tag not found');
@@ -87,10 +88,11 @@ export const entryTagsService = {
         and(
           eq(entryTags.tagId, tagId),
           eq(entries.userId, userId),
-          eq(entries.isActive, true),
         ),
       );
 
     return rows.map((r) => r.entry);
   },
 };
+
+export const entryTagsService = wrapService('entryTagsService', entryTagsServiceRaw);

@@ -22,12 +22,10 @@ export const tags = pgTable(
     isSystemGenerated: boolean('is_system_generated').default(false).notNull(),
     emoji: text('emoji'),
     color: text('color'),
-    isActive: boolean('is_active').default(true).notNull(),
     createdAt: timestamp('created_at').defaultNow().notNull(),
   },
   (table) => [
     uniqueIndex('tags_user_name_idx').on(table.userId, table.name),
-    index('tags_user_active_idx').on(table.userId, table.isActive),
     index('tags_system_idx').on(table.isSystemGenerated),
   ],
 );

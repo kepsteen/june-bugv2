@@ -8,8 +8,27 @@ export function errorHandler(
   res: Response,
   next: NextFunction
 ) {
-  // Log error with request context
-  console.error(`[${req.method}] ${req.path}:`, err);
+  // Log error with full context
+  if (err instanceof AppError && err.context) {
+    console.error(`\n[ERROR] ${err.name}: ${err.message}`);
+    console.error('Request:', {
+      method: err.context.method,
+      path: err.context.path,
+      params: err.context.params,
+      query: err.context.query,
+      userId: err.context.userId,
+    });
+    
+    // Format service call in executable format
+    if (err.context.service && err.context.serviceMethod) {
+      const argsStr = JSON.stringify(err.context.serviceArgs);
+      console.error(`Service Call: ${err.context.service}.${err.context.serviceMethod}(${argsStr})`);
+    }
+    console.error('Stack:', err.stack);
+  } else {
+    // Fallback for errors without context
+    console.error(`[${req.method}] ${req.path}:`, err);
+  }
 
   // Handle ValidationError with structured details
   if (err instanceof ValidationError) {

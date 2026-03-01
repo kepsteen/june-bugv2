@@ -4,12 +4,13 @@ import { user } from '../auth/auth.table.js';
 import type { CreateUserInput, UpdateUserInput, SelectUser } from './users.schema.js';
 import { eq } from 'drizzle-orm';
 import { NotFoundError, ConflictError } from '../../lib/errors/index.js';
+import { wrapService } from '../../lib/service-wrapper.js';
 
-export const userService = {
+const userServiceRaw = {
   /**
    * Find user by ID
    */
-  async findById(id: string): Promise<SelectUser | null> {
+  async findById({ id }: { id: string }): Promise<SelectUser | null> {
     const [foundUser] = await db.select().from(user).where(eq(user.id, id));
     return foundUser ?? null;
   },
@@ -17,7 +18,7 @@ export const userService = {
   /**
    * Find user by email
    */
-  async findByEmail(email: string): Promise<SelectUser | null> {
+  async findByEmail({ email }: { email: string }): Promise<SelectUser | null> {
     const [foundUser] = await db.select().from(user).where(eq(user.email, email));
     return foundUser ?? null;
   },
@@ -26,10 +27,10 @@ export const userService = {
    * Update existing user
    * Validates email uniqueness if changing
    */
-  async update(id: string, data: UpdateUserInput): Promise<SelectUser> {
+  async update({ id, data }: { id: string; data: UpdateUserInput }): Promise<SelectUser> {
     // Check email uniqueness if changing
     if (data.email) {
-      const existing = await this.findByEmail(data.email);
+      const existing = await userServiceRaw.findByEmail({ email: data.email });
       if (existing && existing.id !== id) {
         throw new ConflictError('Email already in use');
       }
@@ -52,8 +53,8 @@ export const userService = {
    * Create new user
    * Validates email uniqueness
    */
-  async create(data: CreateUserInput): Promise<SelectUser> {
-    const existing = await this.findByEmail(data.email);
+  async create({ data }: { data: CreateUserInput }): Promise<SelectUser> {
+    const existing = await userServiceRaw.findByEmail({ email: data.email });
     if (existing) {
       throw new ConflictError('Email already in use');
     }
@@ -66,3 +67,5 @@ export const userService = {
     return newUser;
   },
 };
+
+export const userService = wrapService('userService', userServiceRaw);

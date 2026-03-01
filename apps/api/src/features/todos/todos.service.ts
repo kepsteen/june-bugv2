@@ -2,19 +2,20 @@ import { db } from '@/lib/db/index.js';
 import { todos } from './todos.table.js';
 import { eq, and, desc } from 'drizzle-orm';
 import { NotFoundError } from '@/lib/errors/index.js';
+import { wrapService } from '@/lib/service-wrapper.js';
 import type { Todo } from './todos.table.js';
 
-export const todosService = {
-  async list(userId: string): Promise<Todo[]> {
+const todosServiceRaw = {
+  async list({ userId }: { userId: string }): Promise<Todo[]> {
     return db.select().from(todos).where(eq(todos.userId, userId)).orderBy(desc(todos.createdAt));
   },
 
-  async create(userId: string, text: string): Promise<Todo> {
+  async create({ userId, text }: { userId: string; text: string }): Promise<Todo> {
     const [created] = await db.insert(todos).values({ userId, text }).returning();
     return created;
   },
 
-  async toggle(id: string, userId: string): Promise<Todo> {
+  async toggle({ id, userId }: { id: string; userId: string }): Promise<Todo> {
     // Fetch current state
     const [existing] = await db.select().from(todos).where(
       and(eq(todos.id, id), eq(todos.userId, userId)),
@@ -30,7 +31,7 @@ export const todosService = {
     return updated;
   },
 
-  async delete(id: string, userId: string): Promise<void> {
+  async delete({ id, userId }: { id: string; userId: string }): Promise<void> {
     const [existing] = await db.select().from(todos).where(
       and(eq(todos.id, id), eq(todos.userId, userId)),
     );
@@ -39,3 +40,5 @@ export const todosService = {
     await db.delete(todos).where(and(eq(todos.id, id), eq(todos.userId, userId)));
   },
 };
+
+export const todosService = wrapService('todosService', todosServiceRaw);

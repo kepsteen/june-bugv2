@@ -3,10 +3,8 @@ import {
   pgTable,
   uuid,
   text,
-  boolean,
   timestamp,
   uniqueIndex,
-  index,
 } from 'drizzle-orm/pg-core';
 import { appUsers } from '../app-users/app-users.table';
 import { entryTags } from '../entry-tags/entry-tags.table';
@@ -21,18 +19,12 @@ export const entries = pgTable(
     entryDate: timestamp('entry_date').notNull(),
     content: text('content').notNull().default('{"type":"doc","content":[]}'),
     plainText: text('plain_text').default(''),
-    aiTitle: text('ai_title'),
-    isActive: boolean('is_active').default(true).notNull(),
+    Title: text('title'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
   },
   (table) => [
     uniqueIndex('entries_user_date_idx').on(table.userId, table.entryDate),
-    index('entries_user_active_date_idx').on(
-      table.userId,
-      table.isActive,
-      table.entryDate,
-    ),
   ],
 );
 

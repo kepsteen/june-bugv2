@@ -29,6 +29,20 @@
       "when": 1771192744503,
       "tag": "0003_tired_jackpot",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1772336676764,
+      "tag": "0004_pretty_black_crow",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1772344970377,
+      "tag": "0005_wonderful_doomsday",
+      "breakpoints": true
     }
   ]
 }
