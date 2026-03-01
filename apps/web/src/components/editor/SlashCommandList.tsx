@@ -37,7 +37,7 @@ export const SlashCommandList = forwardRef<any, SlashCommandListProps>((props, r
   }));
 
   return (
-    <div className="z-50 max-h-[min(80vh,24rem)] w-72 overflow-y-auto rounded-lg border bg-background p-1 shadow-md">
+    <div className="slash-command-menu z-50 max-h-[min(80vh,24rem)] w-72 overflow-y-auto rounded-lg border p-1 shadow-md">
       {props.items.length ? (
         props.items.map((item, index) => {
           const Icon = item.icon;
@@ -47,23 +47,23 @@ export const SlashCommandList = forwardRef<any, SlashCommandListProps>((props, r
               type="button"
               className={cn(
                 'flex w-full items-center gap-3 rounded-md px-3 py-2 text-left transition-colors',
-                'hover:bg-muted',
-                index === selectedIndex && 'bg-muted',
+                'hover:bg-secondary',
+                index === selectedIndex && 'bg-secondary',
               )}
               onClick={() => selectItem(index)}
             >
-              <div className="flex h-8 w-8 items-center justify-center rounded-md border bg-background">
-                <Icon className="h-4 w-4" />
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border bg-secondary">
+                <Icon className="h-4 w-4 text-foreground" />
               </div>
               <div className="flex flex-col">
-                <p className="text-sm font-medium">{item.title}</p>
-                <p className="text-xs text-muted-foreground">{item.description}</p>
+                <p className="text-sm font-semibold text-foreground">{item.title}</p>
+                <p className="text-xs text-foreground/70">{item.description}</p>
               </div>
             </button>
           );
         })
       ) : (
-        <div className="px-3 py-2 text-sm text-muted-foreground">No results</div>
+        <div className="px-3 py-2 text-sm text-foreground/70">No results</div>
       )}
     </div>
   );

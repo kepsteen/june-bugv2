@@ -233,6 +233,26 @@
   flex: 1;
 }
 
+/* Tippy.js overrides for slash command menu */
+.tippy-box {
+  background-color: oklch(0.97 0.015 82);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+}
+
+.dark .tippy-box {
+  background-color: var(--card);
+}
+
+.tippy-content {
+  padding: 0;
+}
+
+.tippy-arrow {
+  color: var(--border);
+}
+
 /* Happy wiggle animation */
 @keyframes happyWiggle {
   0%, 100% { transform: rotate(0deg); }
