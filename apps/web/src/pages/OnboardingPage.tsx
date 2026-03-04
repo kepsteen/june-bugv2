@@ -6,6 +6,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { useCompleteOnboardingMutation } from '@/hooks/api';
+import { ThemeToggle } from '@/components/ThemeToggle';
 import { Check } from 'lucide-react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -130,10 +131,10 @@ function getPhaseIndex(questionId: string): number {
 function TypingIndicator() {
   return (
     <div className="flex items-end gap-2 mb-4">
-      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground text-xs font-semibold select-none">
+      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-sidebar text-muted-foreground text-xs font-semibold select-none border border-border/50">
         JB
       </div>
-      <div className="rounded-2xl rounded-bl-sm bg-muted px-4 py-2.5 flex items-center gap-1">
+      <div className="rounded-2xl rounded-bl-sm bg-sidebar px-4 py-2.5 flex items-center gap-1 border border-border/50">
         <span className="h-2 w-2 rounded-full bg-muted-foreground/50 animate-bounce [animation-delay:-0.3s]" />
         <span className="h-2 w-2 rounded-full bg-muted-foreground/50 animate-bounce [animation-delay:-0.15s]" />
         <span className="h-2 w-2 rounded-full bg-muted-foreground/50 animate-bounce" />
@@ -150,10 +151,10 @@ function ChatMessage({ message }: { message: Message }) {
   if (isAssistant) {
     return (
       <div className="flex items-end gap-2 mb-4">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground text-xs font-semibold select-none">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-sidebar text-muted-foreground text-xs font-semibold select-none border border-border/50">
           JB
         </div>
-        <div className="max-w-[75%] rounded-2xl rounded-bl-sm bg-muted px-4 py-2.5 text-sm">
+        <div className="max-w-[75%] rounded-2xl rounded-bl-sm bg-sidebar px-4 py-2.5 text-sm text-foreground border border-border/50">
           {message.content}
         </div>
       </div>
@@ -219,6 +220,10 @@ function AnswerInput({ question, onSubmit, isLoading }: AnswerInputProps) {
   };
 
   if (question.type === 'text' || question.type === 'number') {
+    const isValid = question.type === 'number'
+      ? textValue.trim() !== '' && !isNaN(Number(textValue)) && Number(textValue) > 0
+      : textValue.trim() !== '';
+
     return (
       <div className="flex gap-2">
         <Input
@@ -233,7 +238,7 @@ function AnswerInput({ question, onSubmit, isLoading }: AnswerInputProps) {
           min={question.type === 'number' ? 1 : undefined}
           max={question.type === 'number' ? 120 : undefined}
         />
-        <Button onClick={handleSubmit} disabled={!textValue.trim() || isLoading}>
+        <Button onClick={handleSubmit} disabled={!isValid || isLoading}>
           Send
         </Button>
       </div>
@@ -248,7 +253,7 @@ function AnswerInput({ question, onSubmit, isLoading }: AnswerInputProps) {
             <label
               key={option}
               htmlFor={`radio-${option}`}
-              className="flex items-center gap-3 rounded-lg border border-border px-4 py-2.5 cursor-pointer hover:bg-muted/50 transition-colors has-[[data-state=checked]]:border-primary has-[[data-state=checked]]:bg-primary/5"
+              className="flex items-center gap-3 rounded-lg border border-border/60 bg-sidebar px-4 py-2.5 cursor-pointer hover:bg-sidebar-accent transition-colors has-data-[state=checked]:border-primary has-data-[state=checked]:bg-primary/10"
             >
               <RadioGroupItem id={`radio-${option}`} value={option} />
               <span className="text-sm">{option}</span>
@@ -274,7 +279,7 @@ function AnswerInput({ question, onSubmit, isLoading }: AnswerInputProps) {
             <label
               key={option}
               htmlFor={`check-${option}`}
-              className="flex items-center gap-3 rounded-lg border border-border px-4 py-2.5 cursor-pointer hover:bg-muted/50 transition-colors"
+              className="flex items-center gap-3 rounded-lg border border-border/60 bg-sidebar px-4 py-2.5 cursor-pointer hover:bg-sidebar-accent transition-colors has-data-[state=checked]:border-primary has-data-[state=checked]:bg-primary/10"
             >
               <Checkbox
                 id={`check-${option}`}
@@ -314,10 +319,10 @@ export function OnboardingPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
   const completeOnboardingMutation = useCompleteOnboardingMutation({
-    onSuccess: () => {
+    onSuccess: (data) => {
       navigate('/entries');
     },
-    onError: () => {
+    onError: (error) => {
       setIsSubmitting(false);
       setMessages((prev) => [
         ...prev,
@@ -418,12 +423,12 @@ export function OnboardingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex">
+    <div className="flex h-screen w-full overflow-hidden bg-sidebar relative">
       {/* Sidebar - hidden on mobile */}
-      <aside className="hidden md:flex w-64 shrink-0 flex-col border-r border-border bg-muted/30 px-6 py-8">
+      <aside className="hidden md:flex w-64 shrink-0 flex-col px-6 py-8">
         <div className="mb-8">
-          <h2 className="text-lg font-bold">JuneBug</h2>
-          <p className="text-xs text-muted-foreground mt-0.5">Your journaling companion</p>
+          <h2 className="text-xl font-bold text-foreground">JuneBug</h2>
+          <p className="text-xs text-muted-foreground mt-1">Your journaling companion</p>
         </div>
 
         <div>
@@ -446,8 +451,8 @@ export function OnboardingPage() {
                         isCompleted
                           ? 'bg-primary text-primary-foreground'
                           : isActive
-                          ? 'border-2 border-primary bg-background text-primary'
-                          : 'border-2 border-border bg-background text-muted-foreground',
+                          ? 'border-2 border-primary bg-sidebar text-primary'
+                          : 'border-2 border-border/60 bg-sidebar text-muted-foreground',
                       ].join(' ')}
                     >
                       {isCompleted ? <Check className="h-3.5 w-3.5" /> : i + 1}
@@ -456,7 +461,7 @@ export function OnboardingPage() {
                       <div
                         className={[
                           'w-px flex-1 my-1 min-h-[24px]',
-                          isCompleted ? 'bg-primary' : 'bg-border',
+                          isCompleted ? 'bg-primary' : 'bg-border/60',
                         ].join(' ')}
                       />
                     )}
@@ -482,69 +487,103 @@ export function OnboardingPage() {
       </aside>
 
       {/* Main chat area */}
-      <div className="flex flex-1 flex-col">
-        {/* Chat header */}
-        <header className="border-b border-border px-6 py-4 flex items-center gap-3 bg-background">
-          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-bold select-none">
-            JB
-          </div>
-          <div>
-            <p className="text-sm font-semibold">JuneBug Setup</p>
-            <p className="text-xs text-muted-foreground">Let's personalize your experience</p>
-          </div>
-          {/* Mobile phase indicator */}
-          <div className="ml-auto flex items-center gap-1.5 md:hidden">
-            {PHASES.map((_, i) => (
-              <span
-                key={i}
-                className={[
-                  'h-1.5 w-1.5 rounded-full transition-colors',
-                  completedPhases[i]
-                    ? 'bg-primary'
-                    : i === currentPhaseIndex
-                    ? 'bg-primary/60'
-                    : 'bg-border',
-                ].join(' ')}
-              />
-            ))}
-          </div>
-        </header>
+      <main className="flex-1 flex overflow-hidden relative pt-2">
+        {/* Card container with rounded corner and notch */}
+        <div className="flex-1 bg-card overflow-hidden flex flex-col relative rounded-tl-lg border-l border-border/50">
+          {/* Top border that stops before notch */}
+          <div
+            className="absolute top-0 left-0 right-0 h-[0.5px] bg-sidebar transition-opacity duration-500 ease-in-out"
+            style={{ right: '65px', left: '8px' }}
+          />
 
-        {/* Messages */}
-        <div className="flex-1 overflow-y-auto px-4 py-6 md:px-8">
-          <div className="max-w-xl mx-auto">
-            {messages.map((message, i) => (
-              <ChatMessage key={i} message={message} />
-            ))}
-            {isTyping && <TypingIndicator />}
-            <div ref={messagesEndRef} />
+          {/* Notch SVG */}
+          <div className="absolute top-0 right-0 transition-opacity duration-500 ease-in-out">
+            <svg
+              className="absolute top-0 right-0 w-21 h-10 pointer-events-none"
+              viewBox="0 0 96 48"
+              preserveAspectRatio="none"
+            >
+              <path
+                d="M 96,0 L 0,0 C 20,0 32,9 32,24 C 32,39 44,48 64,48 L 96,48 Z"
+                className="fill-sidebar"
+              />
+              <path
+                d="M 0,0 C 20,0 32,9 32,24 C 32,39 44,48 64,48 L 96,48"
+                className="stroke-border fill-none"
+                strokeWidth="0.5"
+                vectorEffect="non-scaling-stroke"
+              />
+            </svg>
           </div>
+
+          {/* Theme toggle - positioned in the notch area */}
+          <div className="absolute top-1 right-2 z-10">
+            <ThemeToggle />
+          </div>
+
+          {/* Chat header */}
+          <header className="px-6 py-4 flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-bold select-none">
+              JB
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-foreground">JuneBug Setup</p>
+              <p className="text-xs text-muted-foreground">Let's personalize your experience</p>
+            </div>
+            {/* Mobile phase indicator */}
+            <div className="ml-auto flex items-center gap-1.5 md:hidden">
+              {PHASES.map((_, i) => (
+                <span
+                  key={i}
+                  className={[
+                    'h-1.5 w-1.5 rounded-full transition-colors',
+                    completedPhases[i]
+                      ? 'bg-primary'
+                      : i === currentPhaseIndex
+                      ? 'bg-primary/60'
+                      : 'bg-border',
+                  ].join(' ')}
+                />
+              ))}
+            </div>
+          </header>
+
+          {/* Messages */}
+          <div className="flex-1 overflow-y-auto px-4 py-6 md:px-8">
+            <div className="max-w-xl mx-auto">
+              {messages.map((message, i) => (
+                <ChatMessage key={i} message={message} />
+              ))}
+              {isTyping && <TypingIndicator />}
+              <div ref={messagesEndRef} />
+            </div>
+          </div>
+
+          {/* Input area */}
+          {!isComplete && !isTyping && currentQuestion && (
+            <div className="border-t border-border/50 px-4 py-4 md:px-8">
+              <div className="max-w-xl mx-auto">
+                <AnswerInput
+                  key={currentQuestion.id}
+                  question={currentQuestion}
+                  onSubmit={handleAnswer}
+                  isLoading={isSubmitting}
+                />
+              </div>
+            </div>
+          )}
+
+          {isComplete && isSubmitting && (
+            <div className="border-t border-border/50 px-4 py-4 md:px-8">
+              <div className="max-w-xl mx-auto">
+                <p className="text-sm text-center text-muted-foreground">
+                  Saving your preferences...
+                </p>
+              </div>
+            </div>
+          )}
         </div>
-
-        {/* Input area */}
-        {!isComplete && !isTyping && currentQuestion && (
-          <div className="border-t border-border bg-background px-4 py-4 md:px-8">
-            <div className="max-w-xl mx-auto">
-              <AnswerInput
-                key={currentQuestion.id}
-                question={currentQuestion}
-                onSubmit={handleAnswer}
-                isLoading={isSubmitting}
-              />
-            </div>
-          </div>
-        )}
-
-        {isComplete && isSubmitting && (
-          <div className="border-t border-border bg-background px-4 py-4 md:px-8">
-            <div className="max-w-xl mx-auto">
-              <p className="text-sm text-center text-muted-foreground">
-                Saving your preferences...
-              </p>
-            </div>
-          </div>
-        )}
-      </div>
+      </main>
     </div>
   );
 }

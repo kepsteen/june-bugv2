@@ -63,10 +63,6 @@ export function getEntryDisplayTitle(entry: Entry): string {
   return entry.Title || formatEntryDate(entry.entryDate);
 }
 
-export function countWords(text: string): number {
-  return text.trim().split(/\s+/).filter((w) => w.length > 0).length;
-}
-
 export function getTiptapText(content: string): string {
   try {
     const json = JSON.parse(content);

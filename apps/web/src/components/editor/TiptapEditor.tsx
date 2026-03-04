@@ -10,8 +10,13 @@ import { CharacterCount } from '@tiptap/extensions';
 import Code from '@tiptap/extension-code';
 import { EditorBubbleMenu } from './EditorBubbleMenu';
 import { SlashCommand, getSuggestionItems, renderItems } from './SlashCommand';
-import { useEffect, useRef, useState } from 'react';
+import { PromptBlock } from './PromptBlock';
+import { useEffect, useRef, useState, useImperativeHandle, forwardRef } from 'react';
 import { useCreateEntryTitleMutation } from '@/hooks/api';
+
+export interface TiptapEditorRef {
+  insertPromptBlock: (promptText: string, promptId?: string) => void;
+}
 
 interface TiptapEditorProps {
   initialContent: string;
@@ -19,7 +24,7 @@ interface TiptapEditorProps {
   onUpdate: (content: string, plainText: string) => void;
 }
 
-export function TiptapEditor({ initialContent, entryId, onUpdate }: TiptapEditorProps) {
+export const TiptapEditor = forwardRef<TiptapEditorRef, TiptapEditorProps>(function TiptapEditor({ initialContent, entryId, onUpdate }, ref) {
   const editorVersionRef = useRef(0);
   const propVersionRef = useRef(0);
   const is100WordsRef = useRef(false);
@@ -55,6 +60,7 @@ export function TiptapEditor({ initialContent, entryId, onUpdate }: TiptapEditor
           render: renderItems,
         },
       }),
+      PromptBlock,
       CharacterCount,
     ],
     content: initialContent ? JSON.parse(initialContent) : { type: 'doc', content: [] },
@@ -73,8 +79,16 @@ export function TiptapEditor({ initialContent, entryId, onUpdate }: TiptapEditor
     },
   });
 
-  const numWords = editor.storage.characterCount.words();
+  const numWords = editor?.storage?.characterCount?.words() ?? 0;
 
+  // Expose imperative methods via ref
+  useImperativeHandle(ref, () => ({
+    insertPromptBlock: (promptText: string, promptId?: string) => {
+      if (editor) {
+        editor.commands.insertPromptBlock(promptText, promptId);
+      }
+    },
+  }), [editor]);
 
   useEffect(() => {
     propVersionRef.current++;
@@ -117,4 +131,4 @@ export function TiptapEditor({ initialContent, entryId, onUpdate }: TiptapEditor
       <EditorContent editor={editor} className="tiptap-editor" />
     </div>
   );
-}
+});

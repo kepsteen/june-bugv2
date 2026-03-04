@@ -41,9 +41,12 @@ export function useCompleteOnboardingMutation(
   return useMutation({
     ...restOptions,
     mutationFn: (variables: CompleteOnboardingVariables) => appUsersApi.completeOnboarding(variables),
-    onSuccess: (...args) => {
-      queryClient.invalidateQueries({ queryKey: ['appUser'] });
-      queryClient.invalidateQueries({ queryKey: ['appUser', 'onboarding'] });
+    onSuccess: async (...args) => {
+      fetch('http://127.0.0.1:7243/ingest/c77b8c5e-48b1-490d-a366-6f9361fe3c74',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useAppUsers.ts:44',message:'Mutation onSuccess - starting query refetch',data:{},timestamp:Date.now(),hypothesisId:'H3'})}).catch(()=>{});
+      // #endregion
+      // Use refetchQueries instead of invalidateQueries to ensure data is fresh before navigation
+      await queryClient.refetchQueries({ queryKey: ['appUser'] });
+      await queryClient.refetchQueries({ queryKey: ['appUser', 'onboarding'] });
       if (onSuccess) {
         onSuccess(...args);
       }

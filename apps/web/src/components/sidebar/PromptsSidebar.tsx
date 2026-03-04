@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { X, ChevronLeft, Briefcase, Trophy, Bug, Lightbulb } from 'lucide-react';
+import { X, ChevronLeft, Briefcase, Trophy, Bug, Lightbulb, Sparkles, Check } from 'lucide-react';
+import { useGetPersonalizedPromptsQuery } from '@/hooks/api';
+import { cn } from '@/lib/utils';
 
 interface Category {
   id: string;
@@ -11,7 +13,7 @@ interface Category {
   prompts: string[];
 }
 
-const categories: Category[] = [
+const staticCategories: Category[] = [
   {
     id: 'working-on',
     title: "What are you working on?",
@@ -73,11 +75,28 @@ const categories: Category[] = [
 interface PromptsSidebarProps {
   isOpen: boolean;
   onClose: () => void;
-  onPromptClick?: (prompt: string) => void;
+  onPromptClick?: (prompt: string, promptId?: string) => void;
+  activePrompts?: string[];
 }
 
-export function PromptsSidebar({ isOpen, onClose, onPromptClick }: PromptsSidebarProps) {
-  const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
+type SelectedView =
+  | { type: 'category'; category: Category }
+  | { type: 'personalized' }
+  | null;
+
+export function PromptsSidebar({ isOpen, onClose, onPromptClick, activePrompts = [] }: PromptsSidebarProps) {
+  const [selectedView, setSelectedView] = useState<SelectedView>(null);
+  const { data: insightsData, isLoading } = useGetPersonalizedPromptsQuery({
+    enabled: isOpen,
+  });
+
+  const insights = insightsData?.data;
+  const hasPersonalizedPrompts = insights && insights.prompts.length > 0;
+
+  const handleBack = () => setSelectedView(null);
+
+  // Helper to check if a prompt is active (already in the editor)
+  const isPromptActive = (promptText: string) => activePrompts.includes(promptText);
 
   return (
     <aside
@@ -85,7 +104,7 @@ export function PromptsSidebar({ isOpen, onClose, onPromptClick }: PromptsSideba
       style={{ width: isOpen ? '320px' : '0px' }}
     >
       <div className="flex flex-col h-full w-[320px] p-4">
-        {!selectedCategory ? (
+        {!selectedView ? (
           <>
             <div className="flex items-center justify-between mb-2">
               <h2 className="text-base font-semibold text-sidebar-foreground">What's on your mind?</h2>
@@ -97,13 +116,37 @@ export function PromptsSidebar({ isOpen, onClose, onPromptClick }: PromptsSideba
               Choose a category to see helpful writing prompts.
             </p>
             <div className="grid grid-cols-1 gap-3">
-              {categories.map((cat) => {
+              {/* Personalized for You - always shown at top, conditionally enabled */}
+              <button
+                onClick={() => hasPersonalizedPrompts && setSelectedView({ type: 'personalized' })}
+                disabled={!hasPersonalizedPrompts || isLoading}
+                className={`text-left p-3 rounded-lg bg-linear-to-br from-purple-500/10 to-purple-600/5 border border-border transition-all ${
+                  hasPersonalizedPrompts && !isLoading
+                    ? 'hover:scale-[1.02] hover:shadow-sm cursor-pointer'
+                    : 'opacity-60 cursor-not-allowed'
+                }`}
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <Sparkles className="h-4 w-4 text-purple-500" />
+                  <span className="text-sm font-medium">Personalized for You</span>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {isLoading
+                    ? 'Loading your personalized prompts...'
+                    : hasPersonalizedPrompts
+                      ? 'AI-generated prompts based on your entries'
+                      : 'Write a few entries and JuneBug will learn what you\'re working on'}
+                </p>
+              </button>
+
+              {/* Static categories */}
+              {staticCategories.map((cat) => {
                 const Icon = cat.icon;
                 return (
                   <button
                     key={cat.id}
-                    onClick={() => setSelectedCategory(cat)}
-                    className={`text-left p-3 rounded-lg bg-gradient-to-br ${cat.gradient} border border-border hover:scale-[1.02] hover:shadow-sm transition-all`}
+                    onClick={() => setSelectedView({ type: 'category', category: cat })}
+                    className={`text-left p-3 rounded-lg bg-linear-to-br ${cat.gradient} border border-border hover:scale-[1.02] hover:shadow-sm transition-all`}
                   >
                     <div className="flex items-center gap-2 mb-1">
                       <Icon className="h-4 w-4" />
@@ -115,11 +158,96 @@ export function PromptsSidebar({ isOpen, onClose, onPromptClick }: PromptsSideba
               })}
             </div>
           </>
+        ) : selectedView.type === 'personalized' ? (
+          <>
+            <div className="flex items-center justify-between mb-4">
+              <button
+                onClick={handleBack}
+                className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <ChevronLeft className="h-4 w-4" />
+                Back
+              </button>
+              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onClose}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+
+            <div className="flex items-center gap-2 mb-4">
+              <Sparkles className="h-5 w-5 text-purple-500" />
+              <h2 className="text-sm font-semibold">Personalized for You</h2>
+            </div>
+
+            {isLoading ? (
+              <div className="space-y-3">
+                <div className="h-16 w-full bg-muted animate-pulse rounded-md" />
+                <div className="h-16 w-full bg-muted animate-pulse rounded-md" />
+                <div className="h-16 w-full bg-muted animate-pulse rounded-md" />
+                <div className="h-16 w-full bg-muted animate-pulse rounded-md" />
+              </div>
+            ) : insights ? (
+              <>
+                {insights.summary && (
+                  <p className="text-xs text-muted-foreground mb-4 leading-relaxed">
+                    {insights.summary}
+                  </p>
+                )}
+
+                <h3 className="text-xs font-semibold text-muted-foreground mb-3 uppercase tracking-wide">
+                  Writing Prompts
+                </h3>
+
+                <div className="space-y-2 overflow-y-auto">
+                  {insights.prompts.map((prompt, i) => {
+                    const isActive = isPromptActive(prompt.prompt);
+                    return (
+                      <button
+                        key={i}
+                        onClick={() => onPromptClick?.(prompt.prompt)}
+                        disabled={isActive}
+                        className={cn(
+                          'w-full text-left text-sm p-3 rounded-md border border-border transition-colors',
+                          isActive
+                            ? 'bg-muted/50 cursor-default'
+                            : 'hover:bg-accent hover:text-accent-foreground'
+                        )}
+                      >
+                        <div className="flex items-start gap-2">
+                          <span className="text-xs text-purple-500 font-medium block mb-1 flex-1">
+                            {prompt.category}
+                          </span>
+                          {isActive && (
+                            <Check className="h-4 w-4 text-green-500 flex-shrink-0" />
+                          )}
+                        </div>
+                        {prompt.prompt}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {insights.lastAnalyzedAt && (
+                  <p className="text-[10px] text-muted-foreground mt-4 text-center">
+                    Last updated: {new Date(insights.lastAnalyzedAt).toLocaleDateString()}
+                  </p>
+                )}
+              </>
+            ) : (
+              <div className="text-center py-8">
+                <p className="text-sm text-muted-foreground">
+                  No personalized prompts yet.
+                </p>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Write a few entries and JuneBug will learn what you&apos;re working on.
+                </p>
+              </div>
+            )}
+          </>
         ) : (
           <>
             <div className="flex items-center justify-between mb-4">
               <button
-                onClick={() => setSelectedCategory(null)}
+                onClick={handleBack}
                 className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
               >
                 <ChevronLeft className="h-4 w-4" />
@@ -132,10 +260,10 @@ export function PromptsSidebar({ isOpen, onClose, onPromptClick }: PromptsSideba
 
             <div className="flex items-center gap-2 mb-4">
               {(() => {
-                const Icon = selectedCategory.icon;
+                const Icon = selectedView.category.icon;
                 return <Icon className="h-5 w-5" />;
               })()}
-              <h2 className="text-sm font-semibold">{selectedCategory.title}</h2>
+              <h2 className="text-sm font-semibold">{selectedView.category.title}</h2>
             </div>
 
             <h3 className="text-xs font-semibold text-muted-foreground mb-3 uppercase tracking-wide">
@@ -143,15 +271,29 @@ export function PromptsSidebar({ isOpen, onClose, onPromptClick }: PromptsSideba
             </h3>
 
             <div className="space-y-2 overflow-y-auto">
-              {selectedCategory.prompts.map((prompt, i) => (
-                <button
-                  key={i}
-                  onClick={() => onPromptClick?.(prompt)}
-                  className="w-full text-left text-sm p-3 rounded-md border border-border hover:bg-accent hover:text-accent-foreground transition-colors"
-                >
-                  {prompt}
-                </button>
-              ))}
+              {selectedView.category.prompts.map((prompt, i) => {
+                const isActive = isPromptActive(prompt);
+                return (
+                  <button
+                    key={i}
+                    onClick={() => onPromptClick?.(prompt)}
+                    disabled={isActive}
+                    className={cn(
+                      'w-full text-left text-sm p-3 rounded-md border border-border transition-colors',
+                      isActive
+                        ? 'bg-muted/50 cursor-default'
+                        : 'hover:bg-accent hover:text-accent-foreground'
+                    )}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="flex-1">{prompt}</span>
+                      {isActive && (
+                        <Check className="h-4 w-4 text-green-500 flex-shrink-0" />
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </>
         )}

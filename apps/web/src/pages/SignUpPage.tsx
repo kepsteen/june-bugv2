@@ -12,6 +12,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { signUp, signIn } from '@/lib/auth-client';
+import { ThemeToggle } from '@/components/ThemeToggle';
 import { Github } from 'lucide-react';
 
 export function SignUpPage() {
@@ -70,7 +71,12 @@ export function SignUpPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-background px-4">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-background px-4 relative">
+      {/* Theme toggle */}
+      <div className="absolute top-4 right-4">
+        <ThemeToggle />
+      </div>
+
       <div className="w-full max-w-md space-y-4">
         <Card>
           <CardHeader className="space-y-1">

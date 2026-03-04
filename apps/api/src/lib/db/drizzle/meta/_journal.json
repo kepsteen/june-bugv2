@@ -43,6 +43,13 @@
       "when": 1772344970377,
       "tag": "0005_wonderful_doomsday",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1772398704387,
+      "tag": "0006_odd_amphibian",
+      "breakpoints": true
     }
   ]
 }

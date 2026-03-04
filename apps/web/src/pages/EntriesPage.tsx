@@ -6,7 +6,7 @@ import { PanelLeft, Search, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { EntriesSidebar } from '@/components/sidebar/EntriesSidebar';
 import { PromptsSidebar } from '@/components/sidebar/PromptsSidebar';
-import { TiptapEditor } from '@/components/editor/TiptapEditor';
+import { TiptapEditor, type TiptapEditorRef } from '@/components/editor/TiptapEditor';
 import { SearchDialog } from '@/components/SearchDialog';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { ThemeToggle } from '@/components/ThemeToggle';
@@ -38,6 +38,7 @@ export function EntriesPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [entryToDelete, setEntryToDelete] = useState<string | null>(null);
   const sidebarRef = useRef<HTMLElement | null>(null);
+  const editorRef = useRef<TiptapEditorRef | null>(null);
   const isAuthenticated = !!session?.user;
 
   // Fetch entries list
@@ -83,6 +84,7 @@ export function EntriesPage() {
   useEffect(() => {
     currentEntryIdRef.current = entryId;
   }, [entryId]);
+
 
   useEffect(() => {
     const belongsToCurrentEntry = debouncedPending && debouncedPending.entryId === currentEntryIdRef.current;
@@ -152,6 +154,36 @@ export function EntriesPage() {
       }
       return !prev;
     });
+  };
+
+  // Extract active prompts from the current entry content
+  const getActivePrompts = useCallback(() => {
+    if (!currentEntry?.content) return [];
+    try {
+      const content = JSON.parse(currentEntry.content);
+      const prompts: string[] = [];
+      const traverse = (node: unknown) => {
+        if (typeof node !== 'object' || node === null) return;
+        if ('type' in node && node.type === 'promptBlock' && 'attrs' in node && typeof node.attrs === 'object' && node.attrs !== null) {
+          const promptText = (node.attrs as { promptText?: string }).promptText;
+          if (promptText) prompts.push(promptText);
+        }
+        if ('content' in node && Array.isArray(node.content)) {
+          node.content.forEach(traverse);
+        }
+      };
+      traverse(content);
+      return prompts;
+    } catch {
+      return [];
+    }
+  }, [currentEntry?.content]);
+
+  const activePrompts = getActivePrompts();
+
+  const handlePromptClick = (prompt: string) => {
+    // Insert the prompt block into the editor
+    editorRef.current?.insertPromptBlock(prompt);
   };
 
   // Keyboard shortcuts
@@ -237,7 +269,7 @@ export function EntriesPage() {
             className={`absolute z-10 transition-[right] duration-300 ease-in-out ${sidebarCollapsed ? 'bg-background rounded-lg p-1' : ''}`}
             style={{
               top: sidebarCollapsed ? '0.5rem' : '0.25rem',
-              right: promptsOpen ? 'calc(320px + 0.5rem)' : '0.5rem'
+              right: '0.5rem'
             }}
           >
             <ThemeToggle />
@@ -305,6 +337,7 @@ export function EntriesPage() {
               </div>
             ) : currentEntry ? (
               <TiptapEditor
+                ref={editorRef}
                 key={currentEntry.id}
                 entryId={currentEntry.id}
                 initialContent={currentEntry.content}
@@ -328,7 +361,12 @@ export function EntriesPage() {
         </div>
 
         {/* Right sidebar */}
-        <PromptsSidebar isOpen={promptsOpen} onClose={() => setPromptsOpen(false)} />
+        <PromptsSidebar
+          isOpen={promptsOpen}
+          onClose={() => setPromptsOpen(false)}
+          onPromptClick={handlePromptClick}
+          activePrompts={activePrompts}
+        />
       </main>
 
       {/* Floating June Bug button */}

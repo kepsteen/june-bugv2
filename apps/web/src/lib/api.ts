@@ -121,6 +121,28 @@ export const uploadsApi = {
     }),
 };
 
+// Insights
+export const insightsApi = {
+  getPrompts: () =>
+    request<{
+      data: {
+        prompts: { category: string; prompt: string }[];
+        summary: string;
+        topics: string[];
+        lastAnalyzedAt: string;
+      } | null;
+    }>('/api/insights/prompts'),
+  refresh: () =>
+    request<{
+      data: {
+        prompts: { category: string; prompt: string }[];
+        summary: string;
+        topics: string[];
+        lastAnalyzedAt: string;
+      };
+    }>('/api/insights/refresh', { method: 'POST' }),
+};
+
 // Types
 export interface AppUser {
   id: string;

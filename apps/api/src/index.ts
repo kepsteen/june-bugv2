@@ -14,6 +14,7 @@ import { tagsRoutes } from './features/tags/index.js';
 import { entryTagsRouter, tagEntriesRouter } from './features/entry-tags/index.js';
 import { todosRoutes } from './features/todos/index.js';
 import { uploadsRoutes } from './features/uploads/index.js';
+import { insightsRouter } from './features/insights/index.js';
 
 const app = express();
 
@@ -34,6 +35,7 @@ app.use('/api/entries/:entryId/tags', entryTagsRouter);
 app.use('/api/tags/:tagId/entries', tagEntriesRouter);
 app.use('/api/todos', todosRoutes);
 app.use('/api/uploads', uploadsRoutes);
+app.use('/api/insights', insightsRouter);
 
 app.use(errorHandler);
 

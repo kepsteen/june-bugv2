@@ -3,6 +3,7 @@ import { AuthMiddleware } from '../../middleware/auth-middleware.js';
 import { asyncHandler } from '../../lib/async-handler.js';
 import { entriesService } from './entries.service.js';
 import { appUsersService } from '../app-users/app-users.service.js';
+import { insightsService } from '../insights/insights.service.js';
 
 const router: RouterType = Router({ mergeParams: true });
 
@@ -17,6 +18,9 @@ router.get('/', AuthMiddleware(), asyncHandler(async (req: Request, res: Respons
   const appUser = await getAppUser(res);
   const entryList = await entriesService.list({ userId: appUser.id });
   res.json({ data: entryList });
+
+  // Fire-and-forget: refresh insights if stale (non-blocking)
+  insightsService.refreshIfStale(appUser.id);
 }));
 
 // GET /search - search entries (query param q)

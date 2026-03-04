@@ -42,3 +42,9 @@ export {
   useGetPresignedUrlMutation,
   useCompleteUploadMutation,
 } from './useUploads';
+
+// Insights hooks
+export {
+  useGetPersonalizedPromptsQuery,
+  useRefreshInsightsMutation,
+} from './useInsights';
