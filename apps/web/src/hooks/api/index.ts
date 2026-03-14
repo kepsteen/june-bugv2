@@ -54,5 +54,6 @@ export {
   useGetAiOverviewQuery,
   useGetAiEventsQuery,
   useGetQueueOverviewQuery,
+  useGetPlatformOverviewQuery,
   useGetQueueJobEventsQuery,
 } from './useObservability';

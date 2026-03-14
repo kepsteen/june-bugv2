@@ -15,7 +15,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { Plus, Search, User, LogIn, MoreHorizontal, Trash2, BarChart3 } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router';
 import { groupEntriesByDate, getEntryDisplayTitle, formatEntryDateShort, filterEntriesBySearch } from '@/lib/entry-utils';
 import type { Entry } from '@/lib/api';
 
@@ -200,7 +200,7 @@ export function EntriesSidebar({
             </Link>
             {isAdmin && (
               <Link
-                to="/internal"
+                to="/internal/ai"
                 className="flex items-center gap-3 px-2 py-1.5 rounded-md hover:bg-sidebar-accent transition-colors text-xs text-muted-foreground hover:text-sidebar-foreground"
               >
                 <BarChart3 className="h-4 w-4" />

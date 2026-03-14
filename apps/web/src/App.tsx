@@ -1,11 +1,16 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router';
 import { useSession } from '@/lib/auth-client';
 import { EntriesPage } from '@/pages/EntriesPage';
 import { SignInPage } from '@/pages/SignInPage';
 import { SignUpPage } from '@/pages/SignUpPage';
 import { SettingsPage } from '@/pages/SettingsPage';
 import { OnboardingPage } from '@/pages/OnboardingPage';
-import { InternalDashboardPage } from '@/pages/InternalDashboardPage';
+import {
+  InternalDashboardAiPage,
+  InternalDashboardPage,
+  InternalDashboardPlatformPage,
+  InternalDashboardQueuesPage,
+} from '@/pages/InternalDashboardPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { data: session, isPending } = useSession();
@@ -67,7 +72,12 @@ export default function App() {
               <InternalDashboardPage />
             </ProtectedRoute>
           }
-        />
+        >
+          <Route index element={<Navigate to="ai" replace />} />
+          <Route path="ai" element={<InternalDashboardAiPage />} />
+          <Route path="queues" element={<InternalDashboardQueuesPage />} />
+          <Route path="platform" element={<InternalDashboardPlatformPage />} />
+        </Route>
         {/* Legacy routes */}
         <Route path="/login" element={<Navigate to="/sign-in" />} />
         <Route path="/signup" element={<Navigate to="/sign-up" />} />

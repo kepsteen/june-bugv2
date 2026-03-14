@@ -1,6 +1,10 @@
 import { and, desc, eq, gte, lte, sql, count, avg } from 'drizzle-orm';
 import { db } from '@/lib/db/index.js';
 import { wrapService } from '@/lib/service-wrapper.js';
+import { appUsers } from '@/features/app-users/app-users.table.js';
+import { entries } from '@/features/entries/entries.table.js';
+import { memoryEvents, userMemories } from '@/features/memories/memories.table.js';
+import { tags } from '@/features/tags/tags.table.js';
 import {
   aiUsageEvents,
   queueJobEvents,
@@ -12,6 +16,7 @@ import {
   aiUsageFeatureEnum,
   queueJobStatusEnum,
   queueJobTypeEnum,
+  queueJobOutcomeEnum,
 } from './observability.table.js';
 
 // AI Usage Tracking
@@ -158,22 +163,128 @@ async function getQueueOverview(hours: number = 24) {
   };
 }
 
+async function getPlatformOverview(hours: number = 24) {
+  const since = new Date(Date.now() - hours * 60 * 60 * 1000);
+
+  const [
+    [userTotals],
+    [entryTotals],
+    [memoryTotals],
+    memoryStatusBreakdown,
+    memoryEventBreakdown,
+    [tagTotals],
+    tagBreakdown,
+  ] = await Promise.all([
+    db
+      .select({
+        totalUsers: count(appUsers.id),
+        onboardedUsers: count(sql`CASE WHEN ${appUsers.isOnboarded} THEN 1 END`),
+      })
+      .from(appUsers),
+    db
+      .select({
+        totalEntries: count(entries.id),
+        entriesInPeriod: count(sql`CASE WHEN ${entries.createdAt} >= ${since} THEN 1 END`),
+      })
+      .from(entries),
+    db
+      .select({
+        totalMemories: count(userMemories.id),
+      })
+      .from(userMemories),
+    db
+      .select({
+        status: userMemories.status,
+        count: count(userMemories.id),
+      })
+      .from(userMemories)
+      .groupBy(userMemories.status),
+    db
+      .select({
+        eventType: memoryEvents.eventType,
+        count: count(memoryEvents.id),
+      })
+      .from(memoryEvents)
+      .where(gte(memoryEvents.createdAt, since))
+      .groupBy(memoryEvents.eventType),
+    db
+      .select({
+        totalTags: count(tags.id),
+      })
+      .from(tags),
+    db
+      .select({
+        isSystemGenerated: tags.isSystemGenerated,
+        count: count(tags.id),
+      })
+      .from(tags)
+      .groupBy(tags.isSystemGenerated),
+  ]);
+
+  const totalUsers = Number(userTotals?.totalUsers ?? 0);
+  const onboardedUsers = Number(userTotals?.onboardedUsers ?? 0);
+  const systemGeneratedTags =
+    Number(tagBreakdown.find((row) => row.isSystemGenerated)?.count ?? 0);
+
+  return {
+    period: { hours, since: since.toISOString() },
+    users: {
+      totalUsers,
+      onboardedUsers,
+      onboardedRate:
+        totalUsers > 0 ? Math.round((onboardedUsers / totalUsers) * 100) : 0,
+    },
+    entries: {
+      totalEntries: Number(entryTotals?.totalEntries ?? 0),
+      entriesInPeriod: Number(entryTotals?.entriesInPeriod ?? 0),
+    },
+    memories: {
+      totalMemories: Number(memoryTotals?.totalMemories ?? 0),
+      statusBreakdown: memoryStatusBreakdown.map((row) => ({
+        status: row.status,
+        count: Number(row.count),
+      })),
+      eventBreakdown: memoryEventBreakdown.map((row) => ({
+        eventType: row.eventType,
+        count: Number(row.count),
+      })),
+    },
+    tags: {
+      totalTags: Number(tagTotals?.totalTags ?? 0),
+      systemGeneratedTags,
+      userGeneratedTags: Number(tagTotals?.totalTags ?? 0) - systemGeneratedTags,
+    },
+  };
+}
+
 async function listQueueJobEvents(options: {
   userId?: string;
   jobType?: (typeof queueJobTypeEnum.enumValues)[number];
   status?: (typeof queueJobStatusEnum.enumValues)[number];
+  outcome?: (typeof queueJobOutcomeEnum.enumValues)[number];
   jobId?: string;
   startDate?: Date;
   endDate?: Date;
   limit?: number;
   offset?: number;
 }): Promise<QueueJobEvent[]> {
-  const { userId, jobType, status, jobId, startDate, endDate, limit = 100, offset = 0 } = options;
+  const {
+    userId,
+    jobType,
+    status,
+    outcome,
+    jobId,
+    startDate,
+    endDate,
+    limit = 100,
+    offset = 0,
+  } = options;
 
   const conditions = [];
   if (userId) conditions.push(eq(queueJobEvents.userId, userId));
   if (jobType) conditions.push(eq(queueJobEvents.jobType, jobType));
   if (status) conditions.push(eq(queueJobEvents.status, status));
+  if (outcome) conditions.push(eq(queueJobEvents.outcome, outcome));
   if (jobId) conditions.push(eq(queueJobEvents.jobId, jobId));
   if (startDate) conditions.push(gte(queueJobEvents.createdAt, startDate));
   if (endDate) conditions.push(lte(queueJobEvents.createdAt, endDate));
@@ -203,6 +314,7 @@ const observabilityServiceRaw = {
 
   // Queue queries
   getQueueOverview,
+  getPlatformOverview,
   listQueueJobEvents,
 };
 
