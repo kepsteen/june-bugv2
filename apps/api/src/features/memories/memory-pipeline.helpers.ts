@@ -16,7 +16,7 @@ export type ExtractedCandidate = {
   category: MemoryCategory;
   fact: string;
   confidence: number;
-  evidenceSpan?: string;
+  evidenceSpan?: string | null;
   operation: 'create' | 'update' | 'archive_hint';
 };
 

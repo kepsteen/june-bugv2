@@ -74,9 +74,10 @@ router.post('/', AuthMiddleware(), asyncHandler(async (req: Request, res: Respon
 
 // POST / - create entry title
 router.post('/:id/title', AuthMiddleware(), asyncHandler(async (req: Request, res: Response) => {
+  const appUser = await getAppUser(res);
   const { id } = req.params;
   const { content } = req.body;
-  const entry = await entriesService.updateTitle({ id, content });
+  const entry = await entriesService.updateTitle({ id, userId: appUser.id, content });
   res.status(201).json({ data: entry });
 }));
 

@@ -53,6 +53,7 @@ export const appUsers = pgTable('app_users', {
     .references(() => user.id, { onDelete: 'cascade' }),
   email: text('email'),
   isOnboarded: boolean('is_onboarded').default(false).notNull(),
+  isAdmin: boolean('is_admin').default(false).notNull(),
   fullName: text('full_name'),
   age: integer('age'),
   currentRole: text('current_role'),

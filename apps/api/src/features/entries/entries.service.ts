@@ -26,12 +26,10 @@ const entriesServiceRaw = {
 
   async createOrGetByDate({ userId, entryDate }: { userId: string; entryDate?: Date }): Promise<Entry> {
     const date = getMidnightUTC(entryDate ?? new Date());
-    // Check for existing entry due to unique constraint
     const [existing] = await db
       .select().from(entries)
       .where(and(eq(entries.userId, userId), eq(entries.entryDate, date)));
     if (existing) {
-      // Entry already exists for this date, return it
       return existing;
     }
     const [created] = await db.insert(entries).values({
@@ -52,10 +50,9 @@ const entriesServiceRaw = {
     return created;
   },
 
-  async updateTitle({ id, content }: { id: string , content: string}): Promise<Entry> {
-    
-    const generatedTitle = await aiService.generateTitle({ content });
-    
+  async updateTitle({ id, userId, content }: { id: string; userId: string; content: string }): Promise<Entry> {
+    const generatedTitle = await aiService.generateTitle({ content, userId, entryId: id });
+
     const [updated] = await db
       .update(entries)
       .set({ Title: generatedTitle, updatedAt: new Date() })

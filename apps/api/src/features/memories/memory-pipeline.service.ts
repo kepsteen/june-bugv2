@@ -3,6 +3,7 @@ import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import { db } from '@/lib/db/index.js';
 import { entries } from '@/features/entries/entries.table.js';
 import { wrapService } from '@/lib/service-wrapper.js';
+import { observabilityService } from '@/features/observability/observability.service.js';
 import {
   buildMemoryProcessKey,
   MEMORY_EXCHANGE,
@@ -21,10 +22,9 @@ import {
 } from './memories.table.js';
 import {
   buildCanonicalKey,
-  inferCandidatesFromText,
   normalizeForKey,
-  type ExtractedCandidate,
 } from './memory-pipeline.helpers.js';
+import { aiService } from '@/lib/ai/ai.service.js';
 
 export class MemoryJobValidationError extends Error {}
 
@@ -91,12 +91,26 @@ const memoriesPipelineServiceRaw = {
     entryId: string;
     entryUpdatedAt: string;
   }) {
-    if (!isRabbitMqEnabled()) return { published: false as const, reason: 'rabbitmq-disabled' };
+    const jobId = randomUUID();
+
+    if (!isRabbitMqEnabled()) {
+      await observabilityService.recordQueueJobEvent({
+        jobId,
+        jobType: 'memory_entry_changed',
+        userId,
+        entryId,
+        status: 'skipped',
+        retryCount: 0,
+        outcome: 'idempotent_duplicate',
+        metadata: { reason: 'rabbitmq-disabled' },
+      });
+      return { published: false as const, reason: 'rabbitmq-disabled' };
+    }
 
     const channel = await getPublisherChannel();
     const job: MemoryEntryChangedJob = {
       jobVersion: MEMORY_JOB_VERSION,
-      jobId: randomUUID(),
+      jobId,
       userId,
       entryId,
       entryUpdatedAt,
@@ -115,6 +129,16 @@ const memoriesPipelineServiceRaw = {
       },
     );
 
+    await observabilityService.recordQueueJobEvent({
+      jobId,
+      jobType: 'memory_entry_changed',
+      userId,
+      entryId,
+      status: 'published',
+      retryCount: 0,
+      metadata: { published, entryUpdatedAt },
+    });
+
     return {
       published,
       job,
@@ -123,6 +147,7 @@ const memoriesPipelineServiceRaw = {
 
   async processEntryChangedJob({ payload }: { payload: unknown }) {
     const parsed = payload as Partial<MemoryEntryChangedJob>;
+
     if (
       parsed?.jobVersion !== MEMORY_JOB_VERSION ||
       !parsed.userId ||
@@ -132,9 +157,20 @@ const memoriesPipelineServiceRaw = {
       throw new MemoryJobValidationError('Invalid memory job payload');
     }
 
+    const jobId = parsed.jobId ?? 'unknown';
     const idempotencyKey = buildMemoryProcessKey({
       entryId: parsed.entryId,
       entryUpdatedAt: parsed.entryUpdatedAt,
+    });
+
+    await observabilityService.recordQueueJobEvent({
+      jobId,
+      jobType: 'memory_entry_changed',
+      userId: parsed.userId,
+      entryId: null,
+      status: 'processing',
+      retryCount: 0,
+      metadata: { idempotencyKey, entryId: parsed.entryId },
     });
 
     const [alreadyProcessed] = await db
@@ -149,6 +185,16 @@ const memoriesPipelineServiceRaw = {
       .limit(1);
 
     if (alreadyProcessed) {
+      await observabilityService.recordQueueJobEvent({
+        jobId,
+        jobType: 'memory_entry_changed',
+        userId: parsed.userId,
+        entryId: null,
+        status: 'skipped',
+        retryCount: 0,
+        outcome: 'idempotent_duplicate',
+        metadata: { idempotencyKey, entryId: parsed.entryId, reason: 'idempotent-duplicate' },
+      });
       return { skipped: true as const, reason: 'idempotent-duplicate', idempotencyKey };
     }
 
@@ -159,20 +205,34 @@ const memoriesPipelineServiceRaw = {
       .limit(1);
 
     if (!entry) {
+      await observabilityService.recordQueueJobEvent({
+        jobId,
+        jobType: 'memory_entry_changed',
+        userId: parsed.userId,
+        entryId: null,
+        status: 'failed',
+        retryCount: 0,
+        outcome: 'validation_error',
+        errorMessage: 'Entry not found for memory job',
+        metadata: { idempotencyKey, entryId: parsed.entryId },
+      });
       throw new MemoryJobValidationError('Entry not found for memory job');
     }
 
     const payloadUpdatedAt = new Date(parsed.entryUpdatedAt);
     if (Number.isNaN(payloadUpdatedAt.getTime())) {
+      await observabilityService.recordQueueJobEvent({
+        jobId,
+        jobType: 'memory_entry_changed',
+        userId: parsed.userId,
+        entryId: parsed.entryId,
+        status: 'failed',
+        retryCount: 0,
+        outcome: 'validation_error',
+        errorMessage: 'Invalid entryUpdatedAt timestamp',
+        metadata: { idempotencyKey },
+      });
       throw new MemoryJobValidationError('Invalid entryUpdatedAt timestamp');
-    }
-
-    if (entry.updatedAt.getTime() !== payloadUpdatedAt.getTime()) {
-      return {
-        skipped: true as const,
-        reason: 'stale-update',
-        idempotencyKey,
-      };
     }
 
     const plainText = (entry.plainText ?? '').trim();
@@ -189,24 +249,17 @@ const memoriesPipelineServiceRaw = {
           processedAt: new Date().toISOString(),
         },
       });
-      return { skipped: true as const, reason: 'empty-entry-text', idempotencyKey };
-    }
-
-    const extracted = inferCandidatesFromText(plainText);
-    if (extracted.length === 0) {
-      await db.insert(memoryEvents).values({
-        memoryId: null,
-        eventType: 'updated',
-        payload: {
-          idempotencyKey,
-          jobId: parsed.jobId,
-          entryId: entry.id,
-          userId: parsed.userId,
-          outcome: 'no-candidates',
-          processedAt: new Date().toISOString(),
-        },
+      await observabilityService.recordQueueJobEvent({
+        jobId,
+        jobType: 'memory_entry_changed',
+        userId: parsed.userId,
+        entryId: parsed.entryId,
+        status: 'skipped',
+        retryCount: 0,
+        outcome: 'no_entry_text',
+        metadata: { idempotencyKey, reason: 'empty-entry-text' },
       });
-      return { skipped: true as const, reason: 'no-candidates', idempotencyKey };
+      return { skipped: true as const, reason: 'empty-entry-text', idempotencyKey };
     }
 
     const existingMemories = await db
@@ -220,6 +273,43 @@ const memoriesPipelineServiceRaw = {
       )
       .orderBy(desc(userMemories.lastSeenAt))
       .limit(150);
+
+    const extracted = await aiService.extractMemoriesFromEntry({
+      entryText: plainText,
+      existingMemories: existingMemories.map((m) => ({
+        category: m.category,
+        title: m.title,
+        summary: m.summary,
+      })),
+      userId: parsed.userId,
+      entryId: entry.id,
+    });
+
+    if (extracted.length === 0) {
+      await db.insert(memoryEvents).values({
+        memoryId: null,
+        eventType: 'updated',
+        payload: {
+          idempotencyKey,
+          jobId: parsed.jobId,
+          entryId: entry.id,
+          userId: parsed.userId,
+          outcome: 'no-candidates',
+          processedAt: new Date().toISOString(),
+        },
+      });
+      await observabilityService.recordQueueJobEvent({
+        jobId,
+        jobType: 'memory_entry_changed',
+        userId: parsed.userId,
+        entryId: parsed.entryId,
+        status: 'skipped',
+        retryCount: 0,
+        outcome: 'no_candidates',
+        metadata: { idempotencyKey, reason: 'no-candidates' },
+      });
+      return { skipped: true as const, reason: 'no-candidates', idempotencyKey };
+    }
 
     const existingByCanonical = new Map<string, UserMemory>();
     const existingByTitle = new Map<string, UserMemory>();
@@ -343,6 +433,17 @@ const memoriesPipelineServiceRaw = {
         processedAt: new Date().toISOString(),
         changedMemoryCount: changedMemoryIds.length,
       },
+    });
+
+    await observabilityService.recordQueueJobEvent({
+      jobId,
+      jobType: 'memory_entry_changed',
+      userId: parsed.userId,
+      entryId: parsed.entryId,
+      status: 'completed',
+      retryCount: 0,
+      outcome: 'success',
+      metadata: { idempotencyKey, changedMemoryCount: changedMemoryIds.length },
     });
 
     return { processed: true as const, idempotencyKey, changedMemoryIds };

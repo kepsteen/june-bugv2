@@ -48,3 +48,11 @@ export {
   useGetPersonalizedPromptsQuery,
   useRegeneratePersonalizedPromptsMutation,
 } from './usePrompts';
+
+// Observability hooks
+export {
+  useGetAiOverviewQuery,
+  useGetAiEventsQuery,
+  useGetQueueOverviewQuery,
+  useGetQueueJobEventsQuery,
+} from './useObservability';

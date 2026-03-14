@@ -160,6 +160,7 @@ const memoriesServiceRaw = {
       focusCategory,
       entryDraft,
       maxPrompts: 5,
+      userId,
     });
 
     return {

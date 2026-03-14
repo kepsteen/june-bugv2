@@ -5,6 +5,7 @@ import { SignInPage } from '@/pages/SignInPage';
 import { SignUpPage } from '@/pages/SignUpPage';
 import { SettingsPage } from '@/pages/SettingsPage';
 import { OnboardingPage } from '@/pages/OnboardingPage';
+import { InternalDashboardPage } from '@/pages/InternalDashboardPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { data: session, isPending } = useSession();
@@ -56,6 +57,14 @@ export default function App() {
           element={
             <ProtectedRoute>
               <SettingsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/internal"
+          element={
+            <ProtectedRoute>
+              <InternalDashboardPage />
             </ProtectedRoute>
           }
         />

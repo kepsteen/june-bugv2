@@ -14,7 +14,7 @@ This project uses **pnpm** workspaces. Always use `pnpm` instead of `npm`.
 
 Run from the **repo root** unless otherwise noted:
 
-- `pnpm dev` — Start both frontend (`:5173`) and backend (`:3000`) in parallel
+- `pnpm dev` — Start both frontend (`:5174`) and backend (`:3000`) in parallel (always assume it's already running)
 - `pnpm type-check` — Type check all packages
 - `pnpm test` — Run all tests across workspaces
 - `pnpm build` — Build all packages
@@ -43,6 +43,7 @@ Copy `apps/api/.env.example` to `apps/api/.env`. Required variables:
 - `BETTER_AUTH_SECRET` — Min 32-char random string
 
 Optional (features degrade gracefully without them):
+
 - `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` — GitHub OAuth
 - `OPENAI_API_KEY` — AI title generation
 - `AWS_*` + `AWS_S3_BUCKET` — File uploads
@@ -64,6 +65,7 @@ packages/shared/  Shared TypeScript types
 **Feature-based structure**: each feature lives in `src/features/<name>/` containing a table definition, service, routes, and barrel `index.ts`.
 
 **Auth pattern**: Two user tables exist side by side:
+
 - Better Auth manages its own `user`/`session`/`account` tables (in `features/auth/auth.table.ts`)
 - `app_users` table (in `features/app-users/`) stores app-specific profile data and onboarding state, linked via `app_users.auth_id → better_auth.user.id`
 

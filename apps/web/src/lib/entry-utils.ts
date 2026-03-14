@@ -1,14 +1,17 @@
 import { format, isWithinInterval, subDays, startOfDay } from 'date-fns';
 import type { Entry } from './api.js';
 
+function toLocalCalendarDate(dateStr: string): Date {
+  const d = new Date(dateStr);
+  return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+}
+
 export function formatEntryDate(dateStr: string): string {
-  const date = new Date(dateStr);
-  return format(date, 'EEE, MMMM do, yyyy');
+  return format(toLocalCalendarDate(dateStr), 'EEE, MMMM do, yyyy');
 }
 
 export function formatEntryDateShort(dateStr: string): string {
-  const date = new Date(dateStr);
-  return format(date, 'EEE, MMM d');
+  return format(toLocalCalendarDate(dateStr), 'EEE, MMM d');
 }
 
 export function formatSavedTime(dateStr: string): string {
@@ -36,7 +39,7 @@ export function groupEntriesByDate(entries: Entry[]): {
   const older: Entry[] = [];
 
   for (const entry of entries) {
-    const date = new Date(entry.entryDate);
+    const date = toLocalCalendarDate(entry.entryDate);
     if (date >= sevenDaysAgo) {
       last7Days.push(entry);
     } else if (date >= thirtyDaysAgo) {

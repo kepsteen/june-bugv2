@@ -207,6 +207,7 @@ export function EntriesPage() {
         sidebarWidth={SIDEBAR_WIDTH}
         isAuthenticated={isAuthenticated}
         user={session?.user ? { name: session.user.name, image: session.user.image } : null}
+        isAdmin={appUserData?.data?.isAdmin}
       />
 
       {/* Collapse button - sits at top-left of page over sidebar when open */}

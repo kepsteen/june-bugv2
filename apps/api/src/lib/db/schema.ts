@@ -9,3 +9,4 @@ export * from '../../features/entry-tags/entry-tags.table';
 export * from '../../features/todos/todos.table';
 export * from '../../features/memories/memories.table';
 export * from '../../features/prompts/prompts.table';
+export * from '../../features/observability/observability.table';

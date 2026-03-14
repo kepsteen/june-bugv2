@@ -14,7 +14,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { Plus, Search, User, LogIn, MoreHorizontal, Trash2 } from 'lucide-react';
+import { Plus, Search, User, LogIn, MoreHorizontal, Trash2, BarChart3 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { groupEntriesByDate, getEntryDisplayTitle, formatEntryDateShort, filterEntriesBySearch } from '@/lib/entry-utils';
 import type { Entry } from '@/lib/api';
@@ -32,6 +32,7 @@ interface EntriesSidebarProps {
   sidebarWidth: number;
   isAuthenticated: boolean;
   user?: { name?: string; image?: string | null } | null;
+  isAdmin?: boolean;
 }
 
 export function EntriesSidebar({
@@ -47,6 +48,7 @@ export function EntriesSidebar({
   sidebarWidth,
   isAuthenticated,
   user,
+  isAdmin,
 }: EntriesSidebarProps) {
   const navigate = useNavigate();
 
@@ -179,22 +181,33 @@ export function EntriesSidebar({
         <div className="absolute bottom-0 left-0 right-0 h-16 bg-linear-to-t from-sidebar via-sidebar/80 to-transparent pointer-events-none" />
       </div>
 
-      <div className="mt-3 bg-sidebar">
+      <div className="mt-3 bg-sidebar space-y-1">
         {isAuthenticated ? (
-          <Link
-            to="/settings"
-            className="flex items-center gap-3 p-2 rounded-md hover:bg-sidebar-accent transition-colors"
-          >
-            <Avatar className="h-10 w-10">
-              <AvatarImage src={user?.image || ''} alt="User avatar" />
-              <AvatarFallback className="bg-primary/10">
-                <User className="h-5 w-5 text-primary" />
-              </AvatarFallback>
-            </Avatar>
-            <span className="text-sm font-medium truncate text-sidebar-foreground">
-              {user?.name || 'User'}
-            </span>
-          </Link>
+          <>
+            <Link
+              to="/settings"
+              className="flex items-center gap-3 p-2 rounded-md hover:bg-sidebar-accent transition-colors"
+            >
+              <Avatar className="h-10 w-10">
+                <AvatarImage src={user?.image || ''} alt="User avatar" />
+                <AvatarFallback className="bg-primary/10">
+                  <User className="h-5 w-5 text-primary" />
+                </AvatarFallback>
+              </Avatar>
+              <span className="text-sm font-medium truncate text-sidebar-foreground">
+                {user?.name || 'User'}
+              </span>
+            </Link>
+            {isAdmin && (
+              <Link
+                to="/internal"
+                className="flex items-center gap-3 px-2 py-1.5 rounded-md hover:bg-sidebar-accent transition-colors text-xs text-muted-foreground hover:text-sidebar-foreground"
+              >
+                <BarChart3 className="h-4 w-4" />
+                <span>Internal Dashboard</span>
+              </Link>
+            )}
+          </>
         ) : (
           <Button variant="default" className="w-full" onClick={() => navigate('/sign-in')}>
             <LogIn className="h-4 w-4 mr-2" />

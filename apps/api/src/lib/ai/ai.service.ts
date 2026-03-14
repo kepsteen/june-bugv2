@@ -1,6 +1,7 @@
 import { generateText, Output } from 'ai';
 import { wrapService } from '@/lib/service-wrapper.js';
 import { AppError } from '@/lib/errors/index.js';
+import { observabilityService } from '@/features/observability/observability.service.js';
 import z from 'zod';
 
 const memoryCategorySchema = z.enum([
@@ -24,7 +25,7 @@ const extractedMemoryCandidateSchema = z.object({
   category: memoryCategorySchema,
   fact: z.string().min(1).max(280),
   confidence: z.number().min(0).max(1),
-  evidenceSpan: z.string().min(1).max(240).optional(),
+  evidenceSpan: z.string().min(1).max(240).nullable(),
   operation: memoryOperationSchema,
 });
 
@@ -109,7 +110,7 @@ function heuristicExtractMemories(entryText: string, maxCandidates: number): Ext
       category: 'blocker',
       fact: (firstSentence ?? 'Current blocker noted in latest entry').slice(0, 280),
       confidence: 0.55,
-      evidenceSpan: firstSentence?.slice(0, 240),
+      evidenceSpan: firstSentence?.slice(0, 240) ?? null,
       operation: 'create',
     });
   }
@@ -125,7 +126,7 @@ function heuristicExtractMemories(entryText: string, maxCandidates: number): Ext
       category: 'win',
       fact: (firstSentence ?? 'Recent shipped work noted in latest entry').slice(0, 280),
       confidence: 0.6,
-      evidenceSpan: firstSentence?.slice(0, 240),
+      evidenceSpan: firstSentence?.slice(0, 240) ?? null,
       operation: 'create',
     });
   }
@@ -159,7 +160,7 @@ function finalizeCandidates(
           ...candidate,
           fact,
           confidence: clamp(candidate.confidence),
-          evidenceSpan: candidate.evidenceSpan?.trim().slice(0, 240) || undefined,
+          evidenceSpan: candidate.evidenceSpan?.trim().slice(0, 240) ?? null,
         });
       }
     }
@@ -219,46 +220,104 @@ function fallbackPrompts({
 }
 
 const aiServiceRaw = {
-  async generateTitle({ content }: { content: string }): Promise<string> {
+  async generateTitle({
+    content,
+    userId,
+    entryId,
+  }: {
+    content: string;
+    userId: string;
+    entryId?: string;
+  }): Promise<string> {
     if (!content?.trim()) {
       throw new AppError('Content is required for title generation', 400);
     }
 
+    const startTime = Date.now();
+    const model = 'openai/gpt-4o-mini';
+
     if (!process.env.AI_GATEWAY_API_KEY) {
+      await observabilityService.recordAiUsage({
+        userId,
+        feature: 'entry_title',
+        model,
+        status: 'error',
+        latencyMs: Date.now() - startTime,
+        errorMessage: 'OpenAI API key not configured',
+        requestContext: entryId ? { entryId } : undefined,
+      });
       throw new AppError('OpenAI API key not configured', 500);
     }
 
-    const { text } = await generateText({
-      model: 'openai/gpt-4o-mini',
-      output: Output.object({
-        schema: z.object({
-          title: z.string()
-            .max(50)
-            .refine(
-              (val) => !val.includes('"') && !val.includes("'"),
-              { message: "Title must not contain quotes" }
-            ),
+    try {
+      const { text } = await generateText({
+        model,
+        output: Output.object({
+          schema: z.object({
+            title: z.string()
+              .max(50)
+              .refine(
+                (val) => !val.includes('"') && !val.includes("'"),
+                { message: "Title must not contain quotes" }
+              ),
+          }),
         }),
-      }),
-      prompt: `Generate a concise title (max 50 chars, do not use quotes) for this journal entry:\n\n${content}`,
-    });
-    const textJSON = JSON.parse(text);
-    return textJSON.title;
+        prompt: `Generate a concise title (max 50 chars, do not use quotes) for this journal entry:\n\n${content}`,
+      });
+      const textJSON = JSON.parse(text);
+
+      await observabilityService.recordAiUsage({
+        userId,
+        feature: 'entry_title',
+        model,
+        status: 'success',
+        latencyMs: Date.now() - startTime,
+        requestContext: entryId ? { entryId } : undefined,
+      });
+
+      return textJSON.title;
+    } catch (error) {
+      await observabilityService.recordAiUsage({
+        userId,
+        feature: 'entry_title',
+        model,
+        status: 'error',
+        latencyMs: Date.now() - startTime,
+        errorMessage: error instanceof Error ? error.message : 'Unknown error',
+        requestContext: entryId ? { entryId } : undefined,
+      });
+      throw error;
+    }
   },
 
   async extractMemoriesFromEntry({
     entryText,
     existingMemories = [],
     maxCandidates = 8,
+    userId,
+    entryId,
   }: {
     entryText: string;
     existingMemories?: Array<Pick<MemoryForPrompt, 'category' | 'title' | 'summary'>>;
     maxCandidates?: number;
+    userId: string;
+    entryId?: string;
   }): Promise<ExtractedMemoryCandidate[]> {
     if (!entryText?.trim()) return [];
 
     const safeMax = Math.max(1, Math.min(maxCandidates, 12));
+    const startTime = Date.now();
+    const model = 'openai/gpt-4o-mini';
+
     if (!hasAiGatewayKey()) {
+      await observabilityService.recordAiUsage({
+        userId,
+        feature: 'memory_extraction',
+        model,
+        status: 'fallback',
+        latencyMs: Date.now() - startTime,
+        requestContext: { entryId, memoryCount: existingMemories.length },
+      });
       return finalizeCandidates(heuristicExtractMemories(entryText, safeMax), safeMax);
     }
 
@@ -282,18 +341,42 @@ const aiServiceRaw = {
       entryText,
     ].join('\n');
 
-    const { text } = await generateText({
-      model: 'openai/gpt-4o-mini',
-      output: Output.object({
-        schema: z.object({
-          candidates: z.array(extractedMemoryCandidateSchema).max(20),
+    try {
+      const { text } = await generateText({
+        model,
+        output: Output.object({
+          schema: z.object({
+            candidates: z.array(extractedMemoryCandidateSchema).max(20),
+          }),
         }),
-      }),
-      prompt,
-    });
+        prompt,
+      });
 
-    const parsed = JSON.parse(text) as { candidates?: ExtractedMemoryCandidate[] };
-    return finalizeCandidates(parsed.candidates ?? [], safeMax);
+      const parsed = JSON.parse(text) as { candidates?: ExtractedMemoryCandidate[] };
+      const result = finalizeCandidates(parsed.candidates ?? [], safeMax);
+
+      await observabilityService.recordAiUsage({
+        userId,
+        feature: 'memory_extraction',
+        model,
+        status: 'success',
+        latencyMs: Date.now() - startTime,
+        requestContext: { entryId, memoryCount: existingMemories.length },
+      });
+
+      return result;
+    } catch (error) {
+      await observabilityService.recordAiUsage({
+        userId,
+        feature: 'memory_extraction',
+        model,
+        status: 'error',
+        latencyMs: Date.now() - startTime,
+        errorMessage: error instanceof Error ? error.message : 'Unknown error',
+        requestContext: { entryId, memoryCount: existingMemories.length },
+      });
+      return finalizeCandidates(heuristicExtractMemories(entryText, safeMax), safeMax);
+    }
   },
 
   async generatePersonalizedPrompts({
@@ -301,14 +384,20 @@ const aiServiceRaw = {
     focusCategory,
     entryDraft,
     maxPrompts = 5,
+    userId,
+    entryId,
   }: {
     memories: MemoryForPrompt[];
     focusCategory?: MemoryCategory;
     entryDraft?: string;
     maxPrompts?: number;
+    userId: string;
+    entryId?: string;
   }): Promise<PersonalizedPromptSuggestion[]> {
     const safeMax = Math.max(3, Math.min(maxPrompts, 5));
     const activeMemories = memories.filter((memory) => memory.status !== 'archived');
+    const startTime = Date.now();
+    const model = 'openai/gpt-4o-mini';
 
     if (activeMemories.length === 0) {
       return [
@@ -321,6 +410,14 @@ const aiServiceRaw = {
     }
 
     if (!hasAiGatewayKey()) {
+      await observabilityService.recordAiUsage({
+        userId,
+        feature: 'personalized_prompts',
+        model,
+        status: 'fallback',
+        latencyMs: Date.now() - startTime,
+        requestContext: { entryId, focusCategory, memoryCount: activeMemories.length },
+      });
       return fallbackPrompts({
         memories: activeMemories,
         focusCategory,
@@ -351,30 +448,58 @@ const aiServiceRaw = {
       memoryContext,
     ].join('\n');
 
-    const { text } = await generateText({
-      model: 'openai/gpt-4o-mini',
-      output: Output.object({
-        schema: z.object({
-          prompts: z.array(personalizedPromptSchema).min(3).max(5),
+    try {
+      const { text } = await generateText({
+        model,
+        output: Output.object({
+          schema: z.object({
+            prompts: z.array(personalizedPromptSchema).min(3).max(5),
+          }),
         }),
-      }),
-      prompt,
-    });
+        prompt,
+      });
 
-    const parsed = JSON.parse(text) as { prompts?: PersonalizedPromptSuggestion[] };
-    const prompts = parsed.prompts ?? [];
-    const unique = new Map<string, PersonalizedPromptSuggestion>();
-    for (const suggestion of prompts) unique.set(suggestion.prompt, suggestion);
-    const finalized = [...unique.values()].slice(0, safeMax);
+      const parsed = JSON.parse(text) as { prompts?: PersonalizedPromptSuggestion[] };
+      const prompts = parsed.prompts ?? [];
+      const unique = new Map<string, PersonalizedPromptSuggestion>();
+      for (const suggestion of prompts) unique.set(suggestion.prompt, suggestion);
+      const finalized = [...unique.values()].slice(0, safeMax);
 
-    if (finalized.length >= 3) return finalized;
+      await observabilityService.recordAiUsage({
+        userId,
+        feature: 'personalized_prompts',
+        model,
+        status: 'success',
+        latencyMs: Date.now() - startTime,
+        requestContext: { entryId, focusCategory, memoryCount: activeMemories.length },
+      });
 
-    return fallbackPrompts({
-      memories: activeMemories,
-      focusCategory,
-      entryDraft,
-      maxPrompts: safeMax,
-    });
+      if (finalized.length >= 3) return finalized;
+
+      return fallbackPrompts({
+        memories: activeMemories,
+        focusCategory,
+        entryDraft,
+        maxPrompts: safeMax,
+      });
+    } catch (error) {
+      await observabilityService.recordAiUsage({
+        userId,
+        feature: 'personalized_prompts',
+        model,
+        status: 'error',
+        latencyMs: Date.now() - startTime,
+        errorMessage: error instanceof Error ? error.message : 'Unknown error',
+        requestContext: { entryId, focusCategory, memoryCount: activeMemories.length },
+      });
+
+      return fallbackPrompts({
+        memories: activeMemories,
+        focusCategory,
+        entryDraft,
+        maxPrompts: safeMax,
+      });
+    }
   },
 };
 

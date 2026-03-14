@@ -16,6 +16,7 @@ import { todosRoutes } from './features/todos/index.js';
 import { uploadsRoutes } from './features/uploads/index.js';
 import { memoriesRoutes } from './features/memories/index.js';
 import { promptsRoutes } from './features/prompts/index.js';
+import { observabilityRoutes } from './features/observability/index.js';
 
 const app = express();
 
@@ -38,6 +39,7 @@ app.use('/api/todos', todosRoutes);
 app.use('/api/uploads', uploadsRoutes);
 app.use('/api/memories', memoriesRoutes);
 app.use('/api/prompts', promptsRoutes);
+app.use('/api/internal/observability', observabilityRoutes);
 
 app.use(errorHandler);
 
