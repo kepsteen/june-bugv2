@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { useDebounce } from 'use-debounce';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { PanelLeft, Search, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { EntriesSidebar } from '@/components/sidebar/EntriesSidebar';
-import { PromptsSidebar } from '@/components/sidebar/PromptsSidebar';
+import { PromptsSidebar, promptCategories } from '@/components/sidebar/PromptsSidebar';
 import { TiptapEditor } from '@/components/editor/TiptapEditor';
 import { SearchDialog } from '@/components/SearchDialog';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
@@ -18,6 +19,7 @@ import {
   useDeleteEntryMutation,
 } from '@/hooks/api';
 import { useGetCurrentAppUserQuery } from '@/hooks/api';
+import { promptsApi } from '@/lib/api';
 import { useSession } from '@/lib/auth-client';
 import { formatEntryDate, formatSavedTime } from '@/lib/entry-utils';
 
@@ -26,6 +28,7 @@ const SIDEBAR_WIDTH = 280;
 export function EntriesPage() {
   const { entryId } = useParams<{ entryId?: string }>();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { data: session } = useSession();
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -64,6 +67,25 @@ export function EntriesPage() {
       navigate(`/entries/${entries[0].id}`, { replace: true });
     }
   }, [entries, entryId, isAuthenticated, navigate]);
+
+  useEffect(() => {
+    if (!isAuthenticated || !currentEntry?.id) return;
+
+    for (const category of promptCategories) {
+      void queryClient.prefetchQuery({
+        queryKey: ['prompts', 'personalized', currentEntry.id, category.focusCategory],
+        queryFn: () =>
+          promptsApi.getPersonalized({
+            payload: {
+              entryId: currentEntry.id,
+              focusCategory: category.focusCategory,
+              entryDraft: currentEntry.plainText ?? undefined,
+            },
+          }),
+        staleTime: 60_000,
+      });
+    }
+  }, [currentEntry?.id, isAuthenticated, queryClient]);
 
   // Update entry mutation with success callback
   const updateMutation = useUpdateEntryMutation({
@@ -234,10 +256,10 @@ export function EntriesPage() {
 
           {/* Theme toggle - positioned inside the notch when sidebar open, with beige pill when collapsed */}
           <div
-            className={`absolute z-10 transition-[right] duration-300 ease-in-out ${sidebarCollapsed ? 'bg-background rounded-lg p-1' : ''}`}
+            className={`absolute z-10 transition-[top] duration-300 ease-in-out ${sidebarCollapsed ? 'bg-background rounded-lg p-1' : ''}`}
             style={{
               top: sidebarCollapsed ? '0.5rem' : '0.25rem',
-              right: promptsOpen ? 'calc(320px + 0.5rem)' : '0.5rem'
+              right: '0.5rem',
             }}
           >
             <ThemeToggle />
@@ -276,59 +298,66 @@ export function EntriesPage() {
           {/* Editor area */}
           <div
             className="flex-1 overflow-y-auto transition-[padding] duration-300 ease-in-out"
-            style={{ 
-              paddingLeft: promptsOpen ? '14rem' : '4rem', 
-              paddingRight: promptsOpen ? '14rem' : '4rem', 
-              paddingTop: sidebarCollapsed ? '3.5rem' : '1.5rem' 
+            style={{
+              paddingLeft: sidebarCollapsed ? '4rem' : '3rem',
+              paddingRight: promptsOpen ? '2.5rem' : '4rem',
+              paddingTop: sidebarCollapsed ? '3.5rem' : '1.5rem',
             }}
           >
-            {/* Date header and save status */}
-            {currentEntry && (
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-2xl font-bold text-foreground">
-                  {formatEntryDate(currentEntry.entryDate)}
-                </h2>
-                <span className="text-xs text-muted-foreground">
-                  {isSaving ? 'Saving...' : savedTime ? `Last saved ${savedTime}` : ''}
-                </span>
-              </div>
-            )}
+            <div className="mx-auto w-full max-w-4xl">
+              {/* Date header and save status */}
+              {currentEntry && (
+                <div className={`mb-4 flex flex-wrap items-start justify-between gap-x-4 gap-y-1 ${sidebarCollapsed ? '' : 'pr-20'}`}>
+                  <h2 className="min-w-0 text-2xl font-bold leading-tight text-foreground">
+                    {formatEntryDate(currentEntry.entryDate)}
+                  </h2>
+                  <span className="shrink-0 pt-1 text-xs text-muted-foreground">
+                    {isSaving ? 'Saving...' : savedTime ? `Last saved ${savedTime}` : ''}
+                  </span>
+                </div>
+              )}
 
-            {!isAuthenticated ? (
-              <div className="flex flex-col items-center justify-center h-full text-center">
-                <h2 className="text-xl font-semibold mb-2">Welcome to JuneBug</h2>
-                <p className="text-muted-foreground mb-4">Sign in to start journaling</p>
-              </div>
-            ) : entryLoading ? (
-              <div className="flex items-center justify-center h-full">
-                <div className="text-muted-foreground text-sm">Loading entry...</div>
-              </div>
-            ) : currentEntry ? (
-              <TiptapEditor
-                key={currentEntry.id}
-                entryId={currentEntry.id}
-                initialContent={currentEntry.content}
-                onUpdate={handleEditorUpdate}
-              />
-            ) : entries.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full text-center">
-                <h2 className="text-xl font-semibold mb-2">No entries yet</h2>
-                <p className="text-muted-foreground mb-4">Create your first journal entry to get started.</p>
-                <Button onClick={handleNewEntry}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  New Entry
-                </Button>
-              </div>
-            ) : (
-              <div className="flex items-center justify-center h-full">
-                <div className="text-muted-foreground text-sm">Select an entry</div>
-              </div>
-            )}
+              {!isAuthenticated ? (
+                <div className="flex h-full flex-col items-center justify-center text-center">
+                  <h2 className="mb-2 text-xl font-semibold">Welcome to JuneBug</h2>
+                  <p className="mb-4 text-muted-foreground">Sign in to start journaling</p>
+                </div>
+              ) : entryLoading ? (
+                <div className="flex h-full items-center justify-center">
+                  <div className="text-sm text-muted-foreground">Loading entry...</div>
+                </div>
+              ) : currentEntry ? (
+                <TiptapEditor
+                  key={currentEntry.id}
+                  entryId={currentEntry.id}
+                  initialContent={currentEntry.content}
+                  onUpdate={handleEditorUpdate}
+                />
+              ) : entries.length === 0 ? (
+                <div className="flex h-full flex-col items-center justify-center text-center">
+                  <h2 className="mb-2 text-xl font-semibold">No entries yet</h2>
+                  <p className="mb-4 text-muted-foreground">Create your first journal entry to get started.</p>
+                  <Button onClick={handleNewEntry}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    New Entry
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex h-full items-center justify-center">
+                  <div className="text-sm text-muted-foreground">Select an entry</div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
         {/* Right sidebar */}
-        <PromptsSidebar isOpen={promptsOpen} onClose={() => setPromptsOpen(false)} />
+        <PromptsSidebar
+          isOpen={promptsOpen}
+          onClose={() => setPromptsOpen(false)}
+          entryId={currentEntry?.id}
+          entryDraft={currentEntry?.plainText}
+        />
       </main>
 
       {/* Floating June Bug button */}

@@ -4,6 +4,7 @@ import { eq, and, desc, gte, lte, ilike } from 'drizzle-orm';
 import { NotFoundError } from '@/lib/errors/index.js';
 import { wrapService } from '@/lib/service-wrapper.js';
 import { aiService } from '@/lib/ai/ai.service.js';
+import { memoriesPipelineService } from '@/features/memories/memory-pipeline.service.js';
 import type { Entry, NewEntry } from './entries.table.js';
 
 function getMidnightUTC(date: Date): Date {
@@ -39,6 +40,15 @@ const entriesServiceRaw = {
       content: JSON.stringify({ type: 'doc', content: [] }),
       plainText: '',
     }).returning();
+
+    void memoriesPipelineService.publishEntryChangedJob({
+      userId,
+      entryId: created.id,
+      entryUpdatedAt: created.updatedAt.toISOString(),
+    }).catch((error) => {
+      console.error('[entriesService] Failed to publish memory job for create:', error);
+    });
+
     return created;
   },
 
@@ -62,6 +72,15 @@ const entriesServiceRaw = {
       .set({ ...data, updatedAt: new Date() })
       .where(and(eq(entries.id, id), eq(entries.userId, userId)))
       .returning();
+
+    void memoriesPipelineService.publishEntryChangedJob({
+      userId,
+      entryId: updated.id,
+      entryUpdatedAt: updated.updatedAt.toISOString(),
+    }).catch((error) => {
+      console.error('[entriesService] Failed to publish memory job for update:', error);
+    });
+
     return updated;
   },
 

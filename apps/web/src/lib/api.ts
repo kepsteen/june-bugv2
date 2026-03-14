@@ -121,6 +121,24 @@ export const uploadsApi = {
     }),
 };
 
+// Prompts
+export const promptsApi = {
+  getPersonalized: (data: {
+    payload: { entryId: string; focusCategory?: MemoryCategory; entryDraft?: string };
+  }) =>
+    request<{ data: PersonalizedPromptsResult }>('/api/prompts/personalized', {
+      method: 'POST',
+      body: JSON.stringify(data.payload),
+    }),
+  regeneratePersonalized: (data: {
+    payload: { entryId: string; focusCategory?: MemoryCategory; entryDraft?: string };
+  }) =>
+    request<{ data: PersonalizedPromptsResult }>('/api/prompts/personalized/regenerate', {
+      method: 'POST',
+      body: JSON.stringify(data.payload),
+    }),
+};
+
 // Types
 export interface AppUser {
   id: string;
@@ -171,4 +189,38 @@ export interface Todo {
   completed: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+export type MemoryCategory =
+  | 'goal'
+  | 'project'
+  | 'milestone'
+  | 'blocker'
+  | 'win'
+  | 'learning'
+  | 'skill_growth'
+  | 'preference'
+  | 'habit'
+  | 'relationship'
+  | 'value'
+  | 'other';
+
+export interface PersonalizedPromptSuggestion {
+  prompt: string;
+  rationale: string;
+  anchor:
+    | {
+        category: MemoryCategory;
+        memoryTitle: string;
+      }
+    | null;
+}
+
+export interface PersonalizedPromptsResult {
+  prompts: PersonalizedPromptSuggestion[];
+  retrieval: {
+    structuredCount: number;
+    semanticCount: number;
+    consideredCount: number;
+  };
 }

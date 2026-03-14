@@ -42,3 +42,9 @@ export {
   useGetPresignedUrlMutation,
   useCompleteUploadMutation,
 } from './useUploads';
+
+// Prompts hooks
+export {
+  useGetPersonalizedPromptsQuery,
+  useRegeneratePersonalizedPromptsMutation,
+} from './usePrompts';

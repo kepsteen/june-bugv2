@@ -1,0 +1,355 @@
+import { createHash, randomUUID } from 'node:crypto';
+import { and, desc, eq, inArray, sql } from 'drizzle-orm';
+import { db } from '@/lib/db/index.js';
+import { entries } from '@/features/entries/entries.table.js';
+import { wrapService } from '@/lib/service-wrapper.js';
+import {
+  buildMemoryProcessKey,
+  MEMORY_EXCHANGE,
+  MEMORY_JOB_VERSION,
+  MEMORY_ROUTING_KEY,
+  type MemoryEntryChangedJob,
+} from '@/lib/queue/memory-queue.js';
+import { getPublisherChannel, isRabbitMqEnabled } from '@/lib/queue/rabbitmq.js';
+import {
+  memoryEmbeddings,
+  memoryEvents,
+  userMemories,
+  type UserMemory,
+  type MemoryEmbedding,
+  type NewUserMemory,
+} from './memories.table.js';
+import {
+  buildCanonicalKey,
+  inferCandidatesFromText,
+  normalizeForKey,
+  type ExtractedCandidate,
+} from './memory-pipeline.helpers.js';
+
+export class MemoryJobValidationError extends Error {}
+
+const categoryImportance: Record<UserMemory['category'], number> = {
+  goal: 0.95,
+  project: 0.9,
+  milestone: 0.88,
+  blocker: 0.85,
+  win: 0.9,
+  learning: 0.75,
+  skill_growth: 0.78,
+  preference: 0.6,
+  habit: 0.65,
+  relationship: 0.65,
+  value: 0.6,
+  other: 0.45,
+};
+
+function clamp(value: number, min = 0, max = 1) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function deterministicEmbedding(input: string): number[] {
+  const hash = createHash('sha256').update(input).digest();
+  const vector = new Array<number>(1536);
+  for (let i = 0; i < 1536; i += 1) {
+    const byte = hash[(i * 7) % hash.length];
+    vector[i] = (byte / 255) * 2 - 1;
+  }
+  return vector;
+}
+
+
+async function upsertEmbedding(memoryId: string, text: string): Promise<MemoryEmbedding> {
+  const embedding = deterministicEmbedding(text);
+  const [row] = await db
+    .insert(memoryEmbeddings)
+    .values({
+      memoryId,
+      embedding,
+      embeddingModel: 'deterministic-hash-v1',
+      updatedAt: new Date(),
+    })
+    .onConflictDoUpdate({
+      target: memoryEmbeddings.memoryId,
+      set: {
+        embedding,
+        embeddingModel: 'deterministic-hash-v1',
+        updatedAt: new Date(),
+      },
+    })
+    .returning();
+
+  return row;
+}
+
+const memoriesPipelineServiceRaw = {
+  async publishEntryChangedJob({
+    userId,
+    entryId,
+    entryUpdatedAt,
+  }: {
+    userId: string;
+    entryId: string;
+    entryUpdatedAt: string;
+  }) {
+    if (!isRabbitMqEnabled()) return { published: false as const, reason: 'rabbitmq-disabled' };
+
+    const channel = await getPublisherChannel();
+    const job: MemoryEntryChangedJob = {
+      jobVersion: MEMORY_JOB_VERSION,
+      jobId: randomUUID(),
+      userId,
+      entryId,
+      entryUpdatedAt,
+    };
+
+    const published = channel.publish(
+      MEMORY_EXCHANGE,
+      MEMORY_ROUTING_KEY,
+      Buffer.from(JSON.stringify(job)),
+      {
+        persistent: true,
+        contentType: 'application/json',
+        messageId: job.jobId,
+        type: 'memory.entry.changed',
+        timestamp: Date.now(),
+      },
+    );
+
+    return {
+      published,
+      job,
+    };
+  },
+
+  async processEntryChangedJob({ payload }: { payload: unknown }) {
+    const parsed = payload as Partial<MemoryEntryChangedJob>;
+    if (
+      parsed?.jobVersion !== MEMORY_JOB_VERSION ||
+      !parsed.userId ||
+      !parsed.entryId ||
+      !parsed.entryUpdatedAt
+    ) {
+      throw new MemoryJobValidationError('Invalid memory job payload');
+    }
+
+    const idempotencyKey = buildMemoryProcessKey({
+      entryId: parsed.entryId,
+      entryUpdatedAt: parsed.entryUpdatedAt,
+    });
+
+    const [alreadyProcessed] = await db
+      .select({ id: memoryEvents.id })
+      .from(memoryEvents)
+      .where(
+        and(
+          eq(memoryEvents.eventType, 'updated'),
+          sql`${memoryEvents.payload} ->> 'idempotencyKey' = ${idempotencyKey}`,
+        ),
+      )
+      .limit(1);
+
+    if (alreadyProcessed) {
+      return { skipped: true as const, reason: 'idempotent-duplicate', idempotencyKey };
+    }
+
+    const [entry] = await db
+      .select()
+      .from(entries)
+      .where(and(eq(entries.id, parsed.entryId), eq(entries.userId, parsed.userId)))
+      .limit(1);
+
+    if (!entry) {
+      throw new MemoryJobValidationError('Entry not found for memory job');
+    }
+
+    const payloadUpdatedAt = new Date(parsed.entryUpdatedAt);
+    if (Number.isNaN(payloadUpdatedAt.getTime())) {
+      throw new MemoryJobValidationError('Invalid entryUpdatedAt timestamp');
+    }
+
+    if (entry.updatedAt.getTime() !== payloadUpdatedAt.getTime()) {
+      return {
+        skipped: true as const,
+        reason: 'stale-update',
+        idempotencyKey,
+      };
+    }
+
+    const plainText = (entry.plainText ?? '').trim();
+    if (!plainText) {
+      await db.insert(memoryEvents).values({
+        memoryId: null,
+        eventType: 'updated',
+        payload: {
+          idempotencyKey,
+          jobId: parsed.jobId,
+          entryId: entry.id,
+          userId: parsed.userId,
+          outcome: 'no-entry-text',
+          processedAt: new Date().toISOString(),
+        },
+      });
+      return { skipped: true as const, reason: 'empty-entry-text', idempotencyKey };
+    }
+
+    const extracted = inferCandidatesFromText(plainText);
+    if (extracted.length === 0) {
+      await db.insert(memoryEvents).values({
+        memoryId: null,
+        eventType: 'updated',
+        payload: {
+          idempotencyKey,
+          jobId: parsed.jobId,
+          entryId: entry.id,
+          userId: parsed.userId,
+          outcome: 'no-candidates',
+          processedAt: new Date().toISOString(),
+        },
+      });
+      return { skipped: true as const, reason: 'no-candidates', idempotencyKey };
+    }
+
+    const existingMemories = await db
+      .select()
+      .from(userMemories)
+      .where(
+        and(
+          eq(userMemories.userId, parsed.userId),
+          inArray(userMemories.status, ['active', 'stale']),
+        ),
+      )
+      .orderBy(desc(userMemories.lastSeenAt))
+      .limit(150);
+
+    const existingByCanonical = new Map<string, UserMemory>();
+    const existingByTitle = new Map<string, UserMemory>();
+    for (const memory of existingMemories) {
+      if (memory.canonicalKey) existingByCanonical.set(memory.canonicalKey, memory);
+      existingByTitle.set(`${memory.category}:${normalizeForKey(memory.title)}`, memory);
+    }
+
+    const changedMemoryIds: string[] = [];
+    const now = new Date();
+
+    for (const candidate of extracted) {
+      const canonicalKey = buildCanonicalKey(candidate.category, candidate.fact);
+      const title = candidate.fact.slice(0, 120);
+      const fallbackTitleKey = `${candidate.category}:${normalizeForKey(title)}`;
+      const matched =
+        (canonicalKey ? existingByCanonical.get(canonicalKey) : undefined) ??
+        existingByTitle.get(fallbackTitleKey);
+
+      if (candidate.operation === 'archive_hint' && matched) {
+        await db
+          .update(userMemories)
+          .set({
+            status: 'stale',
+            archivedAt: null,
+            confidence: clamp(candidate.confidence),
+            lastSeenAt: now,
+            updatedAt: now,
+          })
+          .where(eq(userMemories.id, matched.id));
+        changedMemoryIds.push(matched.id);
+
+        await db.insert(memoryEvents).values({
+          memoryId: matched.id,
+          eventType: 'archived',
+          payload: { reason: 'archive_hint', idempotencyKey, entryId: entry.id },
+        });
+        continue;
+      }
+
+      if (matched) {
+        await db
+          .update(userMemories)
+          .set({
+            title,
+            summary: candidate.fact,
+            evidenceEntryId: entry.id,
+            confidence: clamp(Math.max(matched.confidence, candidate.confidence)),
+            importance: clamp(Math.max(matched.importance, categoryImportance[candidate.category])),
+            status: 'active',
+            source: 'entry',
+            lastSeenAt: now,
+            updatedAt: now,
+          })
+          .where(eq(userMemories.id, matched.id));
+
+        changedMemoryIds.push(matched.id);
+        await db.insert(memoryEvents).values({
+          memoryId: matched.id,
+          eventType: 'merged',
+          payload: {
+            idempotencyKey,
+            entryId: entry.id,
+            canonicalKey,
+            confidence: candidate.confidence,
+            evidenceSpan: candidate.evidenceSpan,
+          },
+        });
+        continue;
+      }
+
+      const insertValues: NewUserMemory = {
+        userId: parsed.userId,
+        category: candidate.category,
+        title,
+        summary: candidate.fact,
+        evidenceEntryId: entry.id,
+        canonicalKey,
+        confidence: clamp(candidate.confidence),
+        importance: categoryImportance[candidate.category],
+        firstSeenAt: now,
+        lastSeenAt: now,
+        status: 'active',
+        source: 'entry',
+      };
+
+      const [created] = await db.insert(userMemories).values(insertValues).returning();
+      changedMemoryIds.push(created.id);
+
+      await db.insert(memoryEvents).values({
+        memoryId: created.id,
+        eventType: 'created',
+        payload: {
+          idempotencyKey,
+          entryId: entry.id,
+          canonicalKey,
+          confidence: candidate.confidence,
+          evidenceSpan: candidate.evidenceSpan,
+        },
+      });
+    }
+
+    for (const memoryId of changedMemoryIds) {
+      const [memory] = await db
+        .select()
+        .from(userMemories)
+        .where(eq(userMemories.id, memoryId))
+        .limit(1);
+      if (!memory) continue;
+      await upsertEmbedding(memory.id, `${memory.title}\n${memory.summary}`);
+    }
+
+    await db.insert(memoryEvents).values({
+      memoryId: null,
+      eventType: 'updated',
+      payload: {
+        idempotencyKey,
+        jobId: parsed.jobId,
+        userId: parsed.userId,
+        entryId: entry.id,
+        processedAt: new Date().toISOString(),
+        changedMemoryCount: changedMemoryIds.length,
+      },
+    });
+
+    return { processed: true as const, idempotencyKey, changedMemoryIds };
+  },
+};
+
+export const memoriesPipelineService = wrapService(
+  'memoriesPipelineService',
+  memoriesPipelineServiceRaw,
+);

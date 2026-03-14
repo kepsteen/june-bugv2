@@ -37,6 +37,7 @@ react-express-starter/
 ### Setup
 
 1. **Install dependencies:**
+
    ```bash
    pnpm install
    ```
@@ -47,6 +48,7 @@ react-express-starter/
    - Copy the connection string
 
 3. **Configure environment variables:**
+
    ```bash
    # In apps/api/.env
    cp apps/api/.env.example apps/api/.env
@@ -57,12 +59,14 @@ react-express-starter/
    - `BETTER_AUTH_SECRET`: Generate with `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`
 
 4. **Setup database:**
+
    ```bash
    cd apps/api
    pnpm db:push
    ```
 
 5. **Start development servers:**
+
    ```bash
    # From root
    pnpm dev

@@ -1,72 +1,50 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { X, ChevronLeft, Briefcase, Trophy, Bug, Lightbulb } from 'lucide-react';
+import { X, ChevronLeft, Briefcase, Trophy, Bug, Lightbulb, Loader2, RefreshCw } from 'lucide-react';
+import { useGetPersonalizedPromptsQuery, useRegeneratePersonalizedPromptsMutation } from '@/hooks/api';
+import type { MemoryCategory } from '@/lib/api';
 
 interface Category {
   id: string;
+  focusCategory: MemoryCategory;
   title: string;
   description: string;
   icon: React.ComponentType<{ className?: string }>;
   gradient: string;
-  prompts: string[];
 }
 
-const categories: Category[] = [
+export const promptCategories: Category[] = [
   {
     id: 'working-on',
+    focusCategory: 'goal',
     title: "What are you working on?",
     description: "Capture your current project focus.",
     icon: Briefcase,
     gradient: 'from-blue-500/10 to-blue-600/5',
-    prompts: [
-      "What's the most challenging part of your current task?",
-      "What technical decision did you make today, and why?",
-      "What did you learn from your code review today?",
-      "What would make tomorrow's work session more productive?",
-      "What problem have you been avoiding? What's the first step to tackle it?",
-    ],
   },
   {
     id: 'celebrate-win',
+    focusCategory: 'win',
     title: "Celebrate a win",
     description: "Acknowledge your accomplishments.",
     icon: Trophy,
     gradient: 'from-green-500/10 to-green-600/5',
-    prompts: [
-      "What did you ship today that you're proud of?",
-      "What bug did you squash after hours of debugging?",
-      "Who did you help today, and how?",
-      "What skill improved noticeably today?",
-      "What feedback did you receive that felt validating?",
-    ],
   },
   {
     id: 'track-bug',
+    focusCategory: 'blocker',
     title: "Track a bug",
     description: "Document issues and their solutions.",
     icon: Bug,
     gradient: 'from-red-500/10 to-red-600/5',
-    prompts: [
-      "What's the bug you encountered? Describe the symptoms.",
-      "What did you try that didn't work?",
-      "What was the root cause once you found it?",
-      "How will you prevent this bug from recurring?",
-      "What does this bug teach you about the system?",
-    ],
   },
   {
     id: 'capture-lesson',
+    focusCategory: 'learning',
     title: "Capture a lesson",
     description: "Record insights and learnings.",
     icon: Lightbulb,
     gradient: 'from-yellow-500/10 to-yellow-600/5',
-    prompts: [
-      "What concept finally clicked today?",
-      "What would you tell a junior dev about what you learned?",
-      "What assumption did you have that turned out to be wrong?",
-      "What article, doc, or resource was most helpful today?",
-      "How does today's learning connect to something you already knew?",
-    ],
   },
 ];
 
@@ -74,10 +52,31 @@ interface PromptsSidebarProps {
   isOpen: boolean;
   onClose: () => void;
   onPromptClick?: (prompt: string) => void;
+  entryId?: string;
+  entryDraft?: string;
 }
 
-export function PromptsSidebar({ isOpen, onClose, onPromptClick }: PromptsSidebarProps) {
+export function PromptsSidebar({
+  isOpen,
+  onClose,
+  onPromptClick,
+  entryId,
+  entryDraft,
+}: PromptsSidebarProps) {
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
+  const regenerateMutation = useRegeneratePersonalizedPromptsMutation();
+  const { data, isLoading, isError, refetch, isRefetching } = useGetPersonalizedPromptsQuery(
+    {
+      entryId: entryId ?? '',
+      focusCategory: selectedCategory?.focusCategory,
+      entryDraft: entryDraft ?? undefined,
+    },
+    {
+      enabled: isOpen && !!selectedCategory && !!entryId,
+    },
+  );
+
+  const prompts = data?.data.prompts ?? [];
 
   return (
     <aside
@@ -97,13 +96,13 @@ export function PromptsSidebar({ isOpen, onClose, onPromptClick }: PromptsSideba
               Choose a category to see helpful writing prompts.
             </p>
             <div className="grid grid-cols-1 gap-3">
-              {categories.map((cat) => {
+              {promptCategories.map((cat) => {
                 const Icon = cat.icon;
                 return (
                   <button
                     key={cat.id}
                     onClick={() => setSelectedCategory(cat)}
-                    className={`text-left p-3 rounded-lg bg-gradient-to-br ${cat.gradient} border border-border hover:scale-[1.02] hover:shadow-sm transition-all`}
+                    className={`text-left p-3 rounded-lg bg-linear-to-br ${cat.gradient} border border-border hover:scale-[1.02] hover:shadow-sm transition-all`}
                   >
                     <div className="flex items-center gap-2 mb-1">
                       <Icon className="h-4 w-4" />
@@ -136,6 +135,22 @@ export function PromptsSidebar({ isOpen, onClose, onPromptClick }: PromptsSideba
                 return <Icon className="h-5 w-5" />;
               })()}
               <h2 className="text-sm font-semibold">{selectedCategory.title}</h2>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="ml-auto h-7 w-7"
+                disabled={!entryId || regenerateMutation.isPending}
+                onClick={() => {
+                  if (!entryId) return;
+                  regenerateMutation.mutate({
+                    entryId,
+                    focusCategory: selectedCategory.focusCategory,
+                    entryDraft: entryDraft ?? undefined,
+                  });
+                }}
+              >
+                <RefreshCw className={`h-4 w-4 ${regenerateMutation.isPending ? 'animate-spin' : ''}`} />
+              </Button>
             </div>
 
             <h3 className="text-xs font-semibold text-muted-foreground mb-3 uppercase tracking-wide">
@@ -143,15 +158,45 @@ export function PromptsSidebar({ isOpen, onClose, onPromptClick }: PromptsSideba
             </h3>
 
             <div className="space-y-2 overflow-y-auto">
-              {selectedCategory.prompts.map((prompt, i) => (
-                <button
-                  key={i}
-                  onClick={() => onPromptClick?.(prompt)}
-                  className="w-full text-left text-sm p-3 rounded-md border border-border hover:bg-accent hover:text-accent-foreground transition-colors"
-                >
-                  {prompt}
-                </button>
-              ))}
+              {isLoading || isRefetching || regenerateMutation.isPending ? (
+                <div className="text-sm text-muted-foreground border border-border rounded-md p-3 flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Loading personalized prompts...
+                </div>
+              ) : null}
+
+              {isError && !isLoading ? (
+                <div className="space-y-2">
+                  <div className="text-sm text-muted-foreground border border-border rounded-md p-3">
+                    We couldn't load prompts right now.
+                  </div>
+                  <Button variant="outline" size="sm" onClick={() => refetch()} className="w-full">
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Try again
+                  </Button>
+                </div>
+              ) : null}
+
+              {!isLoading && !isError && prompts.length === 0 ? (
+                <div className="text-sm text-muted-foreground border border-border rounded-md p-3">
+                  No prompts yet for this category. Add more entry context and try again.
+                </div>
+              ) : null}
+
+              {!isLoading && !isError
+                ? prompts.map((item, i) => (
+                    <button
+                      key={`${item.prompt}-${i}`}
+                      onClick={() => onPromptClick?.(item.prompt)}
+                      className="w-full text-left text-sm p-3 rounded-md border border-border hover:bg-accent hover:text-accent-foreground transition-colors"
+                    >
+                      <p>{item.prompt}</p>
+                      {item.rationale ? (
+                        <p className="mt-2 text-xs text-muted-foreground">{item.rationale}</p>
+                      ) : null}
+                    </button>
+                  ))
+                : null}
             </div>
           </>
         )}
