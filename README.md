@@ -1,146 +1,121 @@
-# React + Express Starter
+# JuneBug
 
-A production-ready full-stack starter application with React, Vite, Express, Neon Postgres, Better Auth, Drizzle ORM, and Shadcn UI.
+JuneBug is a full-stack journaling app aimed at developers. It gives you one entry per calendar day, a rich text editor, and AI-assisted features: automatic titles, extraction of long-lived “memories” from what you write, and personalized writing prompts grounded in those memories.
 
-## Features
+This repository is a ground-up rewrite of an earlier Convex-based version. The stack is Express, Postgres, Drizzle, and Better Auth.
 
-- 🎨 **React 19** with Vite for fast development
-- ⚡ **Express** backend with TypeScript
-- 🔐 **Better Auth** for email/password authentication
-- 🗄️ **Neon Postgres** serverless database
-- 🛠️ **Drizzle ORM** for type-safe database queries
-- 🎭 **Shadcn UI** for beautiful components
-- 🧪 **Vitest** for fast testing
-- 📦 **pnpm workspaces** monorepo structure
-- 🔒 **ESM modules** throughout
+## What it does
 
-## Project Structure
+**Journaling.** Each user has at most one entry per calendar date. Entries are stored as structured editor JSON (Tiptap) plus plain text for search. You can search across entries, browse by recency, and use tags (including system-assisted tags).
 
+**AI titles.** After enough content is written, the backend can generate a short title for the entry using OpenAI (GPT-4o-mini).
+
+**Memories and prompts.** A pipeline processes entry text to maintain structured memories (e.g. goals, projects, wins, blockers, learnings) with embeddings and audit events. Those memories feed **personalized journaling prompts** in the UI (by focus area: what you’re working on, wins, bugs, lessons). When AI is unavailable, the app falls back to heuristics and template prompts.
+
+**Other product features.** Todos, an onboarding questionnaire (profile and preferences stored on the app user record), and optional GitHub sign-in alongside email/password.
+
+**Operations.** An internal dashboard (admin-only in the UI) surfaces AI usage and queue job telemetry for debugging and cost awareness.
+
+## Architecture
+
+The repo is a **pnpm workspace** monorepo: `apps/web` (React SPA), `apps/api` (Express API), and `packages/shared` (shared TypeScript types).
+
+The API is organized **by feature**: each domain lives under `apps/api/src/features/<name>/` with table definitions (Drizzle), services, and routes where applicable. Authenticated routes resolve an application user record linked to Better Auth’s user id.
+
+```mermaid
+flowchart LR
+  subgraph client [Client]
+    SPA[React SPA]
+  end
+  subgraph api [API]
+    Express[Express]
+    Auth[Better Auth]
+  end
+  subgraph data [Data and async]
+    PG[(Neon Postgres)]
+    RMQ[RabbitMQ]
+    Worker[Memory worker]
+    OpenAI[OpenAI API]
+  end
+  SPA --> Express
+  Express --> Auth
+  Express --> PG
+  Express --> RMQ
+  RMQ --> Worker
+  Worker --> PG
+  Worker --> OpenAI
+  Express --> OpenAI
 ```
-react-express-starter/
-├── apps/
-│   ├── web/          # React + Vite frontend
-│   └── api/          # Express backend
-├── packages/
-│   └── shared/       # Shared types
-└── package.json      # Root workspace config
-```
 
-## Getting Started
+When RabbitMQ is configured, entry changes can enqueue work for the memory pipeline; otherwise synchronous paths still exist for core flows. Optional integrations (S3-style uploads, Resend email) are wired at the environment level where present.
 
-### Prerequisites
+## Tech stack
 
-- Node.js 20+ or 22+ (LTS)
-- pnpm 9+
-- Neon database account (https://neon.tech)
+| Layer | Choices |
+|--------|---------|
+| Frontend | React 19, Vite, TypeScript, Tailwind CSS v4, Shadcn UI, Tiptap, TanStack React Query, Zustand, React Router |
+| Backend | Express, TypeScript, Drizzle ORM, Zod |
+| Database | Neon Postgres (serverless driver) |
+| Auth | Better Auth (email/password, GitHub OAuth) |
+| AI | Vercel AI SDK + OpenAI (titles, memory extraction, prompt suggestions) |
+| Queue | RabbitMQ (async memory pipeline) |
+| Testing | Vitest, Testing Library |
 
-### Setup
+## Getting started
 
-1. **Install dependencies:**
+**Prerequisites:** Node.js 20+ (LTS), pnpm 9+, and a [Neon](https://neon.tech) (or compatible) Postgres database.
+
+1. Install dependencies from the repo root:
 
    ```bash
    pnpm install
    ```
 
-2. **Create Neon database:**
-   - Sign up at https://neon.tech
-   - Create a new project
-   - Copy the connection string
+2. Create `apps/api/.env` with at least:
 
-3. **Configure environment variables:**
+   - `DATABASE_URL` — Postgres connection string  
+   - `BETTER_AUTH_SECRET` — at least 32 characters (e.g. `openssl rand -hex 32`)
+
+   Optional variables cover GitHub OAuth, AI keys (see `apps/api/src/lib/ai/` and `CLAUDE.md`), S3 uploads, RabbitMQ, and email. Core journaling works without optional services; AI-heavy features need the corresponding keys.
+
+3. Apply the schema to your database (development):
 
    ```bash
-   # In apps/api/.env
-   cp apps/api/.env.example apps/api/.env
+   cd apps/api && pnpm db:push
    ```
 
-   Edit `apps/api/.env` and add:
-   - `DATABASE_URL`: Your Neon connection string
-   - `BETTER_AUTH_SECRET`: Generate with `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`
-
-4. **Setup database:**
+4. Start the app from the repo root:
 
    ```bash
-   cd apps/api
-   pnpm db:push
-   ```
-
-5. **Start development servers:**
-
-   ```bash
-   # From root
    pnpm dev
    ```
 
-   This starts:
-   - Frontend: http://localhost:5173
-   - Backend: http://localhost:3000
+   This runs the API (default port **3000**) and the web app (default port **5174**).
 
-## Development
+## Project structure
 
-### Available Scripts
-
-- `pnpm dev` - Run all dev servers in parallel
-- `pnpm build` - Build all packages
-- `pnpm test` - Run all tests
-- `pnpm lint` - Lint all packages
-- `pnpm type-check` - Type check all packages
-
-### Backend Scripts (apps/api)
-
-- `pnpm dev` - Start development server with watch mode
-- `pnpm db:generate` - Generate database migrations
-- `pnpm db:push` - Push schema to database
-- `pnpm db:studio` - Open Drizzle Studio
-
-### Frontend Scripts (apps/web)
-
-- `pnpm dev` - Start Vite dev server
-- `pnpm build` - Build for production
-- `pnpm test` - Run Vitest tests
-- `pnpm test:ui` - Run Vitest with UI
-
-## Testing
-
-The application includes Vitest for testing:
-
-```bash
-# Run all tests
-pnpm test
-
-# Run tests in a specific workspace
-cd apps/web
-pnpm test
-
-# Run tests with UI
-pnpm test:ui
+```
+june-bugv2/
+├── apps/
+│   ├── api/          # Express backend, Drizzle schema, workers
+│   └── web/          # React + Vite frontend
+├── packages/
+│   └── shared/       # Shared types
+├── package.json
+└── pnpm-workspace.yaml
 ```
 
-## Tech Stack
+## Scripts (root)
 
-- **Frontend:** React 19, Vite 7, TypeScript 5.7, Tailwind CSS 3.4, Shadcn UI
-- **Backend:** Express 4, Node.js 20+, TypeScript 5.7
-- **Database:** Neon Postgres, Drizzle ORM 0.37
-- **Auth:** Better Auth 1.4
-- **Testing:** Vitest 3.0, Testing Library
-- **Package Manager:** pnpm 9+
+| Command | Description |
+|---------|-------------|
+| `pnpm dev` | Run API and web dev servers in parallel |
+| `pnpm build` | Build all packages |
+| `pnpm test` | Run tests in all workspaces |
+| `pnpm lint` | Lint all packages |
+| `pnpm type-check` | Typecheck all packages |
 
-## Adding Shadcn Components
-
-To add more Shadcn components:
-
-```bash
-cd apps/web
-pnpm dlx shadcn@latest add [component-name]
-```
-
-## Roadmap
-
-- AI-generated prompts that learn from you
-- Voice input
-- Export all notes as markdown
-- Mobile app
-- Weekly / monthly reflections
+For database tooling (`db:generate`, `db:migrate`, `db:push`, `db:studio`) and API-only tests, see `apps/api/package.json`. For frontend tests, see `apps/web/package.json`.
 
 ## License
 
