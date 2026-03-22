@@ -21,6 +21,30 @@ import {
 
 // AI Usage Tracking
 async function recordAiUsage(event: Omit<NewAiUsageEvent, 'id' | 'createdAt'>): Promise<AiUsageEvent> {
+  // #region agent log
+  fetch('http://127.0.0.1:7243/ingest/bb84193f-a8cf-4886-a1ac-4ac7dc26e58e', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Debug-Session-Id': '6bb92e',
+    },
+    body: JSON.stringify({
+      sessionId: '6bb92e',
+      runId: 'pre-fix',
+      hypothesisId: 'H6',
+      location: 'apps/api/src/features/observability/observability.service.ts:recordAiUsage',
+      message: 'Tokens received by recordAiUsage',
+      data: {
+        feature: event.feature,
+        status: event.status,
+        tokensInput: event.tokensInput ?? null,
+        tokensOutput: event.tokensOutput ?? null,
+      },
+      timestamp: Date.now(),
+    }),
+  }).catch(() => {});
+  // #endregion
+
   const [row] = await db.insert(aiUsageEvents).values(event).returning();
   return row;
 }

@@ -12,6 +12,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { MemoriesTab } from '@/components/settings/MemoriesTab';
 import { useSession, signOut } from '@/lib/auth-client';
 import { ArrowLeft, User } from 'lucide-react';
 import { useGetCurrentAppUserQuery } from '@/hooks/api';
@@ -153,7 +154,7 @@ export function SettingsPage() {
               <CardHeader>
                 <CardTitle>Account Settings</CardTitle>
                 <CardDescription>
-                  Manage your profile, preferences, and notifications.
+                  Manage your profile, preferences, notifications, and memories.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -162,6 +163,7 @@ export function SettingsPage() {
                     <TabsTrigger value="profile">Profile</TabsTrigger>
                     <TabsTrigger value="preferences">Preferences</TabsTrigger>
                     <TabsTrigger value="notifications">Notifications</TabsTrigger>
+                    <TabsTrigger value="memories">Memories</TabsTrigger>
                   </TabsList>
 
                   <TabsContent value="profile" className="space-y-4">
@@ -281,6 +283,10 @@ export function SettingsPage() {
                         No notification preferences configured.
                       </p>
                     )}
+                  </TabsContent>
+
+                  <TabsContent value="memories">
+                    <MemoriesTab />
                   </TabsContent>
                 </Tabs>
               </CardContent>

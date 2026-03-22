@@ -71,6 +71,30 @@ function hasAiGatewayKey() {
   return Boolean(process.env.AI_GATEWAY_API_KEY?.trim());
 }
 
+function extractTokenUsage(
+  usage: unknown,
+): { promptTokens: number | null; completionTokens: number | null; totalTokens: number | null } {
+  if (!usage || typeof usage !== 'object') {
+    return { promptTokens: null, completionTokens: null, totalTokens: null };
+  }
+  const maybeUsage = usage as Record<string, unknown>;
+  const promptTokens =
+    typeof maybeUsage.inputTokens === 'number'
+      ? maybeUsage.inputTokens
+      : typeof maybeUsage.promptTokens === 'number'
+        ? maybeUsage.promptTokens
+        : null;
+  const completionTokens =
+    typeof maybeUsage.outputTokens === 'number'
+      ? maybeUsage.outputTokens
+      : typeof maybeUsage.completionTokens === 'number'
+        ? maybeUsage.completionTokens
+        : null;
+  const totalTokens =
+    typeof maybeUsage.totalTokens === 'number' ? maybeUsage.totalTokens : null;
+  return { promptTokens, completionTokens, totalTokens };
+}
+
 function heuristicExtractMemories(entryText: string, maxCandidates: number): ExtractedMemoryCandidate[] {
   const lines = entryText
     .split('\n')
@@ -250,7 +274,7 @@ const aiServiceRaw = {
     }
 
     try {
-      const { text } = await generateText({
+      const aiResult = await generateText({
         model,
         output: Output.object({
           schema: z.object({
@@ -264,7 +288,39 @@ const aiServiceRaw = {
         }),
         prompt: `Generate a concise title (max 50 chars, do not use quotes) for this journal entry:\n\n${content}`,
       });
-      const textJSON = JSON.parse(text);
+      const textJSON = JSON.parse(aiResult.text);
+      const tokenUsage = extractTokenUsage(aiResult.usage);
+
+      // #region agent log
+      const usageRecord =
+        aiResult.usage && typeof aiResult.usage === 'object'
+          ? (aiResult.usage as Record<string, unknown>)
+          : null;
+      fetch('http://127.0.0.1:7243/ingest/bb84193f-a8cf-4886-a1ac-4ac7dc26e58e', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Debug-Session-Id': '6bb92e',
+        },
+        body: JSON.stringify({
+          sessionId: '6bb92e',
+          runId: 'pre-fix',
+          hypothesisId: 'H5',
+          location: 'apps/api/src/lib/ai/ai.service.ts:generateTitle',
+          message: 'AI provider usage in generateTitle',
+          data: {
+            hasUsage: aiResult.usage != null,
+            usageKeys: usageRecord ? Object.keys(usageRecord) : [],
+            inputTokens: typeof usageRecord?.inputTokens === 'number' ? usageRecord.inputTokens : null,
+            outputTokens: typeof usageRecord?.outputTokens === 'number' ? usageRecord.outputTokens : null,
+            promptTokens: tokenUsage.promptTokens,
+            completionTokens: tokenUsage.completionTokens,
+            totalTokens: tokenUsage.totalTokens,
+          },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
 
       await observabilityService.recordAiUsage({
         userId,
@@ -272,6 +328,8 @@ const aiServiceRaw = {
         model,
         status: 'success',
         latencyMs: Date.now() - startTime,
+        tokensInput: tokenUsage.promptTokens ?? undefined,
+        tokensOutput: tokenUsage.completionTokens ?? undefined,
         requestContext: entryId ? { entryId } : undefined,
       });
 
@@ -342,7 +400,7 @@ const aiServiceRaw = {
     ].join('\n');
 
     try {
-      const { text } = await generateText({
+      const aiResult = await generateText({
         model,
         output: Output.object({
           schema: z.object({
@@ -351,9 +409,41 @@ const aiServiceRaw = {
         }),
         prompt,
       });
+      const tokenUsage = extractTokenUsage(aiResult.usage);
 
-      const parsed = JSON.parse(text) as { candidates?: ExtractedMemoryCandidate[] };
-      const result = finalizeCandidates(parsed.candidates ?? [], safeMax);
+      const parsed = JSON.parse(aiResult.text) as { candidates?: ExtractedMemoryCandidate[] };
+      const finalizedCandidates = finalizeCandidates(parsed.candidates ?? [], safeMax);
+
+      // #region agent log
+      const usageRecord =
+        aiResult.usage && typeof aiResult.usage === 'object'
+          ? (aiResult.usage as Record<string, unknown>)
+          : null;
+      fetch('http://127.0.0.1:7243/ingest/bb84193f-a8cf-4886-a1ac-4ac7dc26e58e', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Debug-Session-Id': '6bb92e',
+        },
+        body: JSON.stringify({
+          sessionId: '6bb92e',
+          runId: 'pre-fix',
+          hypothesisId: 'H5',
+          location: 'apps/api/src/lib/ai/ai.service.ts:extractMemoriesFromEntry',
+          message: 'AI provider usage in extractMemoriesFromEntry',
+          data: {
+            hasUsage: aiResult.usage != null,
+            usageKeys: usageRecord ? Object.keys(usageRecord) : [],
+            inputTokens: typeof usageRecord?.inputTokens === 'number' ? usageRecord.inputTokens : null,
+            outputTokens: typeof usageRecord?.outputTokens === 'number' ? usageRecord.outputTokens : null,
+            promptTokens: tokenUsage.promptTokens,
+            completionTokens: tokenUsage.completionTokens,
+            totalTokens: tokenUsage.totalTokens,
+          },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
 
       await observabilityService.recordAiUsage({
         userId,
@@ -361,10 +451,12 @@ const aiServiceRaw = {
         model,
         status: 'success',
         latencyMs: Date.now() - startTime,
+        tokensInput: tokenUsage.promptTokens ?? undefined,
+        tokensOutput: tokenUsage.completionTokens ?? undefined,
         requestContext: { entryId, memoryCount: existingMemories.length },
       });
 
-      return result;
+      return finalizedCandidates;
     } catch (error) {
       await observabilityService.recordAiUsage({
         userId,
@@ -449,7 +541,7 @@ const aiServiceRaw = {
     ].join('\n');
 
     try {
-      const { text } = await generateText({
+      const aiResult = await generateText({
         model,
         output: Output.object({
           schema: z.object({
@@ -458,12 +550,44 @@ const aiServiceRaw = {
         }),
         prompt,
       });
+      const tokenUsage = extractTokenUsage(aiResult.usage);
 
-      const parsed = JSON.parse(text) as { prompts?: PersonalizedPromptSuggestion[] };
+      const parsed = JSON.parse(aiResult.text) as { prompts?: PersonalizedPromptSuggestion[] };
       const prompts = parsed.prompts ?? [];
       const unique = new Map<string, PersonalizedPromptSuggestion>();
       for (const suggestion of prompts) unique.set(suggestion.prompt, suggestion);
       const finalized = [...unique.values()].slice(0, safeMax);
+
+      // #region agent log
+      const usageRecord =
+        aiResult.usage && typeof aiResult.usage === 'object'
+          ? (aiResult.usage as Record<string, unknown>)
+          : null;
+      fetch('http://127.0.0.1:7243/ingest/bb84193f-a8cf-4886-a1ac-4ac7dc26e58e', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Debug-Session-Id': '6bb92e',
+        },
+        body: JSON.stringify({
+          sessionId: '6bb92e',
+          runId: 'pre-fix',
+          hypothesisId: 'H5',
+          location: 'apps/api/src/lib/ai/ai.service.ts:generatePersonalizedPrompts',
+          message: 'AI provider usage in generatePersonalizedPrompts',
+          data: {
+            hasUsage: aiResult.usage != null,
+            usageKeys: usageRecord ? Object.keys(usageRecord) : [],
+            inputTokens: typeof usageRecord?.inputTokens === 'number' ? usageRecord.inputTokens : null,
+            outputTokens: typeof usageRecord?.outputTokens === 'number' ? usageRecord.outputTokens : null,
+            promptTokens: tokenUsage.promptTokens,
+            completionTokens: tokenUsage.completionTokens,
+            totalTokens: tokenUsage.totalTokens,
+          },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
 
       await observabilityService.recordAiUsage({
         userId,
@@ -471,6 +595,8 @@ const aiServiceRaw = {
         model,
         status: 'success',
         latencyMs: Date.now() - startTime,
+        tokensInput: tokenUsage.promptTokens ?? undefined,
+        tokensOutput: tokenUsage.completionTokens ?? undefined,
         requestContext: { entryId, focusCategory, memoryCount: activeMemories.length },
       });
 

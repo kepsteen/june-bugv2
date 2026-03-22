@@ -121,6 +121,18 @@ export const uploadsApi = {
     }),
 };
 
+// Memories
+export const memoriesApi = {
+  list: (params?: { category?: MemoryCategory; status?: MemoryStatus }) => {
+    const searchParams = new URLSearchParams();
+    if (params?.category) searchParams.set('category', params.category);
+    if (params?.status) searchParams.set('status', params.status);
+    const query = searchParams.toString();
+    return request<{ data: UserMemory[] }>(`/api/memories${query ? `?${query}` : ''}`);
+  },
+  delete: (id: string) => request<void>(`/api/memories/${id}`, { method: 'DELETE' }),
+};
+
 // Prompts
 export const promptsApi = {
   getPersonalized: (data: {
@@ -143,7 +155,7 @@ export const promptsApi = {
 export const observabilityApi = {
   getAiOverview: (hours?: number) =>
     request<{ data: AiOverview }>(`/api/internal/observability/ai/overview?hours=${hours || 24}`),
-  getAiEvents: (params?: {
+  getAiEvents: async (params?: {
     userId?: string;
     feature?: string;
     status?: string;
@@ -160,7 +172,37 @@ export const observabilityApi = {
     if (params?.endDate) searchParams.set('endDate', params.endDate);
     if (params?.limit) searchParams.set('limit', String(params.limit));
     if (params?.offset) searchParams.set('offset', String(params.offset));
-    return request<{ data: AiUsageEvent[] }>(`/api/internal/observability/ai/events?${searchParams.toString()}`);
+    const response = await request<{ data: AiUsageEvent[] }>(
+      `/api/internal/observability/ai/events?${searchParams.toString()}`,
+    );
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/bb84193f-a8cf-4886-a1ac-4ac7dc26e58e', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Debug-Session-Id': '6bb92e',
+      },
+      body: JSON.stringify({
+        sessionId: '6bb92e',
+        runId: 'pre-fix',
+        hypothesisId: 'H2',
+        location: 'apps/web/src/lib/api.ts:observabilityApi.getAiEvents',
+        message: 'AI events payload at frontend API client',
+        data: {
+          count: response.data.length,
+          firstEventKeys: response.data[0] ? Object.keys(response.data[0]) : [],
+          firstTokensInput: response.data[0]?.tokensInput ?? null,
+          firstTokensOutput: response.data[0]?.tokensOutput ?? null,
+          firstTokensInputSnake:
+            (response.data[0] as Record<string, unknown> | undefined)?.tokens_input ?? null,
+          firstTokensOutputSnake:
+            (response.data[0] as Record<string, unknown> | undefined)?.tokens_output ?? null,
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
+    return response;
   },
   getQueueOverview: (hours?: number) =>
     request<{ data: QueueOverview }>(`/api/internal/observability/queues/overview?hours=${hours || 24}`),
@@ -259,6 +301,32 @@ export type MemoryCategory =
   | 'relationship'
   | 'value'
   | 'other';
+
+export type MemoryStatus = 'active' | 'stale' | 'archived';
+
+export interface UserMemory {
+  id: string;
+  userId: string;
+  category: MemoryCategory;
+  title: string;
+  summary: string;
+  evidenceEntryId?: string | null;
+  canonicalKey?: string | null;
+  confidence: number;
+  importance: number;
+  firstSeenAt: string;
+  lastSeenAt: string;
+  status: MemoryStatus;
+  source: 'onboarding' | 'entry' | 'system';
+  goalId?: string | null;
+  projectName?: string | null;
+  impactType?: string | null;
+  impactSummary?: string | null;
+  milestoneState?: 'planned' | 'in_progress' | 'completed' | 'blocked' | null;
+  createdAt: string;
+  updatedAt: string;
+  archivedAt?: string | null;
+}
 
 export interface PersonalizedPromptSuggestion {
   prompt: string;

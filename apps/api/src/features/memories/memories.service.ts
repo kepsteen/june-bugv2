@@ -1,5 +1,6 @@
 import { and, desc, eq, inArray } from 'drizzle-orm';
 import { db } from '@/lib/db/index.js';
+import { NotFoundError } from '@/lib/errors/index.js';
 import { wrapService } from '@/lib/service-wrapper.js';
 import {
   memoryCategoryEnum,
@@ -74,6 +75,22 @@ const memoriesServiceRaw = {
         : 'No entries available to refresh memories yet.',
       request: { userId, reason, entryId: latestEntry?.id },
     };
+  },
+
+  async delete({ id, userId }: { id: string; userId: string }): Promise<void> {
+    const [existing] = await db
+      .select({ id: userMemories.id })
+      .from(userMemories)
+      .where(and(eq(userMemories.id, id), eq(userMemories.userId, userId)))
+      .limit(1);
+
+    if (!existing) {
+      throw new NotFoundError('Memory not found');
+    }
+
+    await db
+      .delete(userMemories)
+      .where(and(eq(userMemories.id, id), eq(userMemories.userId, userId)));
   },
 
   async generatePersonalizedPrompts({

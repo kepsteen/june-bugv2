@@ -43,6 +43,12 @@ export {
   useCompleteUploadMutation,
 } from './useUploads';
 
+// Memories hooks
+export {
+  useGetMemoriesQuery,
+  useDeleteMemoryMutation,
+} from './useMemories';
+
 // Prompts hooks
 export {
   useGetPersonalizedPromptsQuery,

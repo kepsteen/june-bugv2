@@ -2,7 +2,11 @@ import { Router, type Request, type Response, type Router as RouterType } from '
 import { z } from 'zod';
 import { AuthMiddleware } from '@/middleware/auth-middleware.js';
 import { asyncHandler } from '@/lib/async-handler.js';
-import { validateBody, validateQuery } from '@/middleware/validation-middleware.js';
+import {
+  validateBody,
+  validateParams,
+  validateQuery,
+} from '@/middleware/validation-middleware.js';
 import { appUsersService } from '../app-users/app-users.service.js';
 import {
   memoryCategoryEnum,
@@ -19,6 +23,10 @@ const listMemoriesQuerySchema = z.object({
 
 const refreshMemoriesBodySchema = z.object({
   reason: z.enum(['manual', 'backfill', 'debug']).default('manual'),
+});
+
+const memoryParamsSchema = z.object({
+  id: z.uuid(),
 });
 
 async function getAppUser(res: Response) {
@@ -55,6 +63,17 @@ router.post(
     const data = await memoriesService.enqueueRefresh({ userId: appUser.id, reason });
 
     res.status(202).json({ data });
+  }),
+);
+
+router.delete(
+  '/:id',
+  AuthMiddleware(),
+  validateParams(memoryParamsSchema),
+  asyncHandler(async (req: Request, res: Response) => {
+    const appUser = await getAppUser(res);
+    await memoriesService.delete({ id: req.params.id, userId: appUser.id });
+    res.status(204).send();
   }),
 );
 
