@@ -14,7 +14,6 @@ import { aiService, type MemoryCategory } from '@/lib/ai/ai.service.js';
 import type { UserMemory } from './memories.table.js';
 import {
   cosineSimilarity,
-  deterministicEmbedding,
   scoreMemoryForRetrieval,
 } from './memory-retrieval.helpers.js';
 
@@ -133,7 +132,10 @@ const memoriesServiceRaw = {
     const topStructured = structuredRanked.slice(0, 12).map((item) => item.memory);
 
     const semanticQuery = (entryDraft?.trim() || focusCategory || 'developer progress and goals').trim();
-    const queryVector = deterministicEmbedding(semanticQuery);
+    const { embedding: queryVector } = await aiService.embedText({
+      text: semanticQuery,
+      userId,
+    });
     const embeddingRows = await db
       .select({
         memory: userMemories,

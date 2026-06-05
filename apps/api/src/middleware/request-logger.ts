@@ -11,20 +11,19 @@ export function requestLogger(req: Request, res: Response, next: NextFunction) {
 
   // Override res.end to capture response status and timing
   const originalEnd = res.end;
-  res.end = function (chunk?: any, encoding?: any) {
+  res.end = function (this: Response, ...args: unknown[]) {
     const duration = Date.now() - startTime;
     const statusCode = res.statusCode;
     const statusColor = getStatusColor(statusCode);
     const statusSymbol = getStatusSymbol(statusCode);
-    
+
     // Format similar to Next.js: GET /api/entries 200 in 45ms
     // Or: GET /api/entries 404 in 12ms
     const logMessage = `${method} ${originalUrl} ${statusColor}${statusCode}\x1b[0m ${statusSymbol} in ${duration}ms`;
     console.log(logMessage);
 
-    // Call original end
-    originalEnd.call(this, chunk, encoding);
-  };
+    return (originalEnd as (...args: unknown[]) => Response).apply(this, args);
+  } as typeof res.end;
 
   next();
 }

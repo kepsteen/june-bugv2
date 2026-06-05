@@ -1,0 +1,1 @@
+ALTER TYPE "public"."ai_usage_feature" ADD VALUE 'memory_embedding' BEFORE 'personalized_prompts';

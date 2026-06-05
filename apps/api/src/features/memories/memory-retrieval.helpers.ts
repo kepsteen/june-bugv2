@@ -14,7 +14,7 @@ function clamp(value: number, min = 0, max = 1) {
   return Math.max(min, Math.min(max, value));
 }
 
-export function deterministicEmbedding(input: string): number[] {
+export function fallbackDeterministicEmbedding(input: string): number[] {
   const hash = createHash('sha256').update(input).digest();
   const vector = new Array<number>(1536);
   for (let i = 0; i < 1536; i += 1) {

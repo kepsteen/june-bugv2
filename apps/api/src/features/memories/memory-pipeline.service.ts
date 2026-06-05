@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import { db } from '@/lib/db/index.js';
 import { entries } from '@/features/entries/entries.table.js';
@@ -13,13 +13,12 @@ import {
 } from '@/lib/queue/memory-queue.js';
 import { getPublisherChannel, isRabbitMqEnabled } from '@/lib/queue/rabbitmq.js';
 import {
-  memoryEmbeddings,
   memoryEvents,
   userMemories,
   type UserMemory,
-  type MemoryEmbedding,
   type NewUserMemory,
 } from './memories.table.js';
+import { upsertMemoryEmbedding } from './memory-embedding.helpers.js';
 import {
   buildCanonicalKey,
   normalizeForKey,
@@ -45,40 +44,6 @@ const categoryImportance: Record<UserMemory['category'], number> = {
 
 function clamp(value: number, min = 0, max = 1) {
   return Math.max(min, Math.min(max, value));
-}
-
-function deterministicEmbedding(input: string): number[] {
-  const hash = createHash('sha256').update(input).digest();
-  const vector = new Array<number>(1536);
-  for (let i = 0; i < 1536; i += 1) {
-    const byte = hash[(i * 7) % hash.length];
-    vector[i] = (byte / 255) * 2 - 1;
-  }
-  return vector;
-}
-
-
-async function upsertEmbedding(memoryId: string, text: string): Promise<MemoryEmbedding> {
-  const embedding = deterministicEmbedding(text);
-  const [row] = await db
-    .insert(memoryEmbeddings)
-    .values({
-      memoryId,
-      embedding,
-      embeddingModel: 'deterministic-hash-v1',
-      updatedAt: new Date(),
-    })
-    .onConflictDoUpdate({
-      target: memoryEmbeddings.memoryId,
-      set: {
-        embedding,
-        embeddingModel: 'deterministic-hash-v1',
-        updatedAt: new Date(),
-      },
-    })
-    .returning();
-
-  return row;
 }
 
 const memoriesPipelineServiceRaw = {
@@ -419,7 +384,12 @@ const memoriesPipelineServiceRaw = {
         .where(eq(userMemories.id, memoryId))
         .limit(1);
       if (!memory) continue;
-      await upsertEmbedding(memory.id, `${memory.title}\n${memory.summary}`);
+      await upsertMemoryEmbedding({
+        memoryId: memory.id,
+        text: `${memory.title}\n${memory.summary}`,
+        userId: parsed.userId,
+        entryId: entry.id,
+      });
     }
 
     await db.insert(memoryEvents).values({

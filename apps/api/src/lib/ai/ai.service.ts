@@ -1,8 +1,13 @@
-import { generateText, Output } from 'ai';
+import { embed, generateText, Output } from 'ai';
 import { wrapService } from '@/lib/service-wrapper.js';
 import { AppError } from '@/lib/errors/index.js';
 import { observabilityService } from '@/features/observability/observability.service.js';
+import { fallbackDeterministicEmbedding } from '@/features/memories/memory-retrieval.helpers.js';
 import z from 'zod';
+
+export const MEMORY_EMBEDDING_MODEL = 'openai/text-embedding-3-small';
+export const MEMORY_EMBEDDING_MODEL_TAG = 'text-embedding-3-small';
+export const MEMORY_EMBEDDING_FALLBACK_MODEL = 'deterministic-hash-v1';
 
 const memoryCategorySchema = z.enum([
   'goal',
@@ -244,6 +249,83 @@ function fallbackPrompts({
 }
 
 const aiServiceRaw = {
+  async embedText({
+    text,
+    userId,
+    entryId,
+    memoryId,
+  }: {
+    text: string;
+    userId: string;
+    entryId?: string;
+    memoryId?: string;
+  }): Promise<{ embedding: number[]; embeddingModel: string }> {
+    const trimmed = text?.trim() ?? '';
+    const startTime = Date.now();
+    const model = MEMORY_EMBEDDING_MODEL;
+    const requestContext = { entryId, memoryId };
+
+    if (!trimmed) {
+      return {
+        embedding: fallbackDeterministicEmbedding(''),
+        embeddingModel: MEMORY_EMBEDDING_FALLBACK_MODEL,
+      };
+    }
+
+    if (!hasAiGatewayKey()) {
+      await observabilityService.recordAiUsage({
+        userId,
+        feature: 'memory_embedding',
+        model,
+        status: 'fallback',
+        latencyMs: Date.now() - startTime,
+        requestContext,
+      });
+      return {
+        embedding: fallbackDeterministicEmbedding(trimmed),
+        embeddingModel: MEMORY_EMBEDDING_FALLBACK_MODEL,
+      };
+    }
+
+    try {
+      const result = await embed({
+        model,
+        value: trimmed,
+      });
+      const tokenUsage = extractTokenUsage(result.usage);
+
+      await observabilityService.recordAiUsage({
+        userId,
+        feature: 'memory_embedding',
+        model,
+        status: 'success',
+        latencyMs: Date.now() - startTime,
+        tokensInput: tokenUsage.promptTokens ?? undefined,
+        requestContext,
+      });
+
+      return {
+        embedding: [...result.embedding],
+        embeddingModel: MEMORY_EMBEDDING_MODEL_TAG,
+      };
+    } catch (error) {
+      await observabilityService.recordAiUsage({
+        userId,
+        feature: 'memory_embedding',
+        model,
+        status: 'error',
+        latencyMs: Date.now() - startTime,
+        errorMessage: error instanceof Error ? error.message : 'Unknown error',
+        requestContext,
+      });
+
+      return {
+        embedding: fallbackDeterministicEmbedding(trimmed),
+        embeddingModel: MEMORY_EMBEDDING_FALLBACK_MODEL,
+      };
+    }
+  },
+
   async generateTitle({
     content,
     userId,
@@ -413,37 +495,6 @@ const aiServiceRaw = {
 
       const parsed = JSON.parse(aiResult.text) as { candidates?: ExtractedMemoryCandidate[] };
       const finalizedCandidates = finalizeCandidates(parsed.candidates ?? [], safeMax);
-
-      // #region agent log
-      const usageRecord =
-        aiResult.usage && typeof aiResult.usage === 'object'
-          ? (aiResult.usage as Record<string, unknown>)
-          : null;
-      fetch('http://127.0.0.1:7243/ingest/bb84193f-a8cf-4886-a1ac-4ac7dc26e58e', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Debug-Session-Id': '6bb92e',
-        },
-        body: JSON.stringify({
-          sessionId: '6bb92e',
-          runId: 'pre-fix',
-          hypothesisId: 'H5',
-          location: 'apps/api/src/lib/ai/ai.service.ts:extractMemoriesFromEntry',
-          message: 'AI provider usage in extractMemoriesFromEntry',
-          data: {
-            hasUsage: aiResult.usage != null,
-            usageKeys: usageRecord ? Object.keys(usageRecord) : [],
-            inputTokens: typeof usageRecord?.inputTokens === 'number' ? usageRecord.inputTokens : null,
-            outputTokens: typeof usageRecord?.outputTokens === 'number' ? usageRecord.outputTokens : null,
-            promptTokens: tokenUsage.promptTokens,
-            completionTokens: tokenUsage.completionTokens,
-            totalTokens: tokenUsage.totalTokens,
-          },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-      // #endregion
 
       await observabilityService.recordAiUsage({
         userId,

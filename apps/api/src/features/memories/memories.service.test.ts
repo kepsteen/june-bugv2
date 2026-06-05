@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   cosineSimilarity,
-  deterministicEmbedding,
+  fallbackDeterministicEmbedding,
   getFreshnessDecayScore,
   scoreMemoryForRetrieval,
 } from './memory-retrieval.helpers.js';
@@ -37,10 +37,10 @@ function createMemory(overrides: Partial<UserMemory> = {}): UserMemory {
 }
 
 describe('memory retrieval scoring helpers', () => {
-  it('builds stable deterministic embeddings', () => {
-    const a = deterministicEmbedding('focus:goals');
-    const b = deterministicEmbedding('focus:goals');
-    const c = deterministicEmbedding('focus:blockers');
+  it('builds stable fallback deterministic embeddings', () => {
+    const a = fallbackDeterministicEmbedding('focus:goals');
+    const b = fallbackDeterministicEmbedding('focus:goals');
+    const c = fallbackDeterministicEmbedding('focus:blockers');
 
     expect(a).toHaveLength(1536);
     expect(a).toEqual(b);
@@ -48,8 +48,8 @@ describe('memory retrieval scoring helpers', () => {
   });
 
   it('scores cosine similarity higher for identical vectors', () => {
-    const vec = deterministicEmbedding('same');
-    const other = deterministicEmbedding('different');
+    const vec = fallbackDeterministicEmbedding('same');
+    const other = fallbackDeterministicEmbedding('different');
 
     const selfScore = cosineSimilarity(vec, vec);
     const otherScore = cosineSimilarity(vec, other);
