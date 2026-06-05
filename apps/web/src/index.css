@@ -134,72 +134,47 @@
   color: var(--muted-foreground);
 }
 
-.markdown-preview {
-  font-family: var(--font-sans);
-  font-size: 0.875rem;
-  line-height: 1.75;
-}
-
-.markdown-preview h1 {
+/* Live preview typography */
+.markdown-editor .cm-line.cm-h1 {
   font-size: 1.75rem;
   font-weight: 700;
-  margin-top: 1rem;
-  margin-bottom: 0.5rem;
 }
 
-.markdown-preview h2 {
+.markdown-editor .cm-line.cm-h2 {
   font-size: 1.4rem;
   font-weight: 600;
-  margin-top: 0.875rem;
-  margin-bottom: 0.5rem;
 }
 
-.markdown-preview h3 {
+.markdown-editor .cm-line.cm-h3 {
   font-size: 1.15rem;
   font-weight: 600;
-  margin-top: 0.75rem;
-  margin-bottom: 0.5rem;
 }
 
-.markdown-preview p {
-  margin-top: 0.5rem;
-  margin-bottom: 0.5rem;
+.markdown-editor .cm-line.cm-h4 {
+  font-size: 1rem;
+  font-weight: 600;
 }
 
-.markdown-preview ul {
-  padding-left: 1.5rem;
-  list-style-type: disc;
+.markdown-editor .cm-line.cm-h5 {
+  font-size: 0.95rem;
+  font-weight: 600;
 }
 
-.markdown-preview ol {
-  padding-left: 1.5rem;
-  list-style-type: decimal;
-}
-
-.markdown-preview ul.contains-task-list {
-  list-style: none;
-  padding-left: 0;
-}
-
-.markdown-preview li.task-list-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.5rem;
-}
-
-.markdown-preview li.task-list-item input[type='checkbox'] {
-  margin-top: 0.35rem;
-  flex-shrink: 0;
-}
-
-.markdown-preview blockquote {
-  border-left: 4px solid var(--border);
-  padding-left: 1rem;
+.markdown-editor .cm-line.cm-h6 {
+  font-size: 0.9rem;
+  font-weight: 600;
   color: var(--muted-foreground);
-  margin: 0.5rem 0;
 }
 
-.markdown-preview code {
+.markdown-editor .cm-strong {
+  font-weight: 700;
+}
+
+.markdown-editor .cm-em {
+  font-style: italic;
+}
+
+.markdown-editor .cm-inline-code {
   background: var(--muted);
   padding: 0.1em 0.3em;
   border-radius: 0.25rem;
@@ -207,41 +182,34 @@
   font-size: 0.85em;
 }
 
-.markdown-preview pre {
-  background: var(--muted);
-  padding: 1rem;
-  border-radius: 0.5rem;
-  overflow-x: auto;
-}
-
-.markdown-preview pre code {
-  background: none;
-  padding: 0;
-}
-
-.markdown-preview a {
+.markdown-editor .cm-link {
   color: var(--primary);
   text-decoration: underline;
   text-underline-offset: 4px;
+  cursor: pointer;
 }
 
-.markdown-preview hr {
+.markdown-editor .cm-line.cm-blockquote {
+  border-left: 4px solid var(--border);
+  padding-left: 1rem;
+  color: var(--muted-foreground);
+}
+
+.markdown-editor .cm-line.cm-code-block {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  background: color-mix(in oklch, var(--muted) 50%, transparent);
+}
+
+.markdown-editor .cm-line.cm-list-item {
+  padding-left: 0.25rem;
+}
+
+.markdown-editor .cm-hr-widget {
   border: none;
   border-top: 1px solid var(--border);
   margin: 1rem 0;
-}
-
-.markdown-preview table {
-  width: 100%;
-  border-collapse: collapse;
-  margin: 0.75rem 0;
-}
-
-.markdown-preview th,
-.markdown-preview td {
-  border: 1px solid var(--border);
-  padding: 0.5rem 0.75rem;
-  text-align: left;
+  height: 0;
 }
 
 /* Happy wiggle animation */
