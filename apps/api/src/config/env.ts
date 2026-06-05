@@ -26,6 +26,7 @@ const envSchema = z.object({
 
   // Resend
   RESEND_API_KEY: z.string().optional(),
+  EMAIL_FROM: z.string().optional(),
 });
 
 export const env = envSchema.parse(process.env);

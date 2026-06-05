@@ -50,6 +50,31 @@ Optional (features degrade gracefully without them):
 - `RABBITMQ_URL` — Background jobs
 - `RESEND_API_KEY` — Email
 
+## Database: Creating & Migrating
+
+Migrations live in `apps/api/src/lib/db/drizzle/`. Each migration is a `NNNN_<name>.sql` file plus a matching `meta/NNNN_snapshot.json`, and **every** migration must have a corresponding entry in `meta/_journal.json`. The schema is defined in `src/lib/db/schema.ts` (which aggregates each feature's table file).
+
+`drizzle-kit migrate` replays the journal in order, so the journal, the `.sql` files, and the snapshots must stay in sync. **Migration `0004_pretty_black_crow` is the baseline** — it creates every table from scratch (its snapshot has the zero `prevId`). Migrations `0000`–`0003` were squashed into it and intentionally no longer exist; the journal starts at idx 4. Never re-add `0000`–`0003`.
+
+### Set up a fresh database
+
+1. Create a Neon Postgres database and put its connection string in `apps/api/.env` as `DATABASE_URL`.
+2. From `apps/api`, run `pnpm db:migrate`. This creates the `drizzle.__drizzle_migrations` tracking table and applies `0004` → latest. You should end up with all `public` tables and one row per applied migration.
+
+### Make schema changes
+
+1. Edit the relevant table file under `src/features/<name>/` (and ensure it's exported into `src/lib/db/schema.ts`).
+2. From `apps/api`, run `pnpm db:generate`. Drizzle diffs the schema against the latest snapshot and writes a new `NNNN_*.sql` + snapshot, appending an entry to `_journal.json`. Review the generated SQL.
+3. Run `pnpm db:migrate` to apply it.
+4. Commit the new `.sql`, its snapshot, and the updated `_journal.json` **together**.
+
+### Rules & gotchas
+
+- **Keep the journal honest.** A `_journal.json` entry without a matching `.sql` file breaks `pnpm db:migrate` for everyone on a fresh DB (it errors trying to read the missing file), even though `pnpm db:generate` keeps working because it only reads the latest snapshot. This exact drift was the cause of a past migration-history bug.
+- **`db:push` does not use migrations.** It diffs the schema straight onto the DB and never creates `__drizzle_migrations`. Use it only for throwaway local experimentation; a `push`-built database is not "migrate-managed" and `db:migrate` will later try to re-create existing tables. Prefer `db:migrate` so prod and CI stay reproducible.
+- **Squashing/editing history:** if you ever consolidate migrations, delete the obsolete `.sql` files, their snapshots, **and** their `_journal.json` entries in the same change.
+- **Validate risky migration changes on a disposable Neon branch** (create a branch, reset its `public` schema, run `pnpm db:migrate` against the branch's connection string) before touching the primary database.
+
 ## Architecture
 
 ### Monorepo Structure

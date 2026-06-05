@@ -3,6 +3,7 @@ import { useSession } from '@/lib/auth-client';
 import { EntriesPage } from '@/pages/EntriesPage';
 import { SignInPage } from '@/pages/SignInPage';
 import { SignUpPage } from '@/pages/SignUpPage';
+import { ResetPasswordPage } from '@/pages/ResetPasswordPage';
 import { SettingsPage } from '@/pages/SettingsPage';
 import { OnboardingPage } from '@/pages/OnboardingPage';
 import {
@@ -47,6 +48,7 @@ export default function App() {
         <Route path="/" element={<Navigate to="/entries" />} />
         <Route path="/sign-in" element={<AuthRoute><SignInPage /></AuthRoute>} />
         <Route path="/sign-up" element={<AuthRoute><SignUpPage /></AuthRoute>} />
+        <Route path="/reset-password" element={<AuthRoute><ResetPasswordPage /></AuthRoute>} />
         <Route path="/entries" element={<EntriesPage />} />
         <Route path="/entries/:entryId" element={<EntriesPage />} />
         <Route
