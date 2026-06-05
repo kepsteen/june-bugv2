@@ -1,4 +1,4 @@
-import { format, isWithinInterval, subDays, startOfDay } from 'date-fns';
+import { format, subDays, startOfDay } from 'date-fns';
 import type { Entry } from './api.js';
 
 function toLocalCalendarDate(dateStr: string): Date {
@@ -70,20 +70,31 @@ export function countWords(text: string): number {
   return text.trim().split(/\s+/).filter((w) => w.length > 0).length;
 }
 
-export function getTiptapText(content: string): string {
-  try {
-    const json = JSON.parse(content);
-    return extractText(json);
-  } catch {
-    return '';
-  }
-}
+export function markdownToPlainText(markdown: string): string {
+  if (!markdown.trim()) return '';
 
-function extractText(node: any): string {
-  if (!node) return '';
-  if (node.type === 'text') return node.text || '';
-  if (node.content) {
-    return node.content.map(extractText).join(' ');
-  }
-  return '';
+  let text = markdown;
+
+  text = text.replace(/```[\s\S]*?```/g, (block) =>
+    block.replace(/^```[^\n]*\n?/, '').replace(/\n?```$/, ''),
+  );
+
+  text = text
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/^>\s?/gm, '')
+    .replace(/^[-*+]\s+\[[ xX]\]\s+/gm, '')
+    .replace(/^\d+\.\s+/gm, '')
+    .replace(/^[-*+]\s+/gm, '')
+    .replace(/!\[([^\]]*)\]\([^)]+\)/g, '$1')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/\*([^*]+)\*/g, '$1')
+    .replace(/__([^_]+)__/g, '$1')
+    .replace(/_([^_]+)_/g, '$1')
+    .replace(/~~([^~]+)~~/g, '$1')
+    .replace(/^---+$/gm, '')
+    .replace(/\s{2}\n/g, '\n');
+
+  return text.replace(/\n{3,}/g, '\n\n').trim();
 }

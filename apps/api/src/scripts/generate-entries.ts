@@ -203,24 +203,8 @@ async function generateAiEntry({
 	return parsed.plainText.trim();
 }
 
-function toTiptapDocJson(plainText: string): string {
-	const paragraphs = plainText
-		.split(/\n{2,}/)
-		.map((paragraph) => paragraph.trim())
-		.filter(Boolean);
-
-	const content =
-		paragraphs.length > 0
-			? paragraphs.map((paragraph) => ({
-					type: "paragraph",
-					content: [{ type: "text", text: paragraph }],
-				}))
-			: [{ type: "paragraph", content: [] }];
-
-	return JSON.stringify({
-		type: "doc",
-		content,
-	});
+function toMarkdown(plainText: string): string {
+	return plainText.trim();
 }
 
 async function resolveUser(args: ArgMap): Promise<AppUser> {
@@ -436,7 +420,7 @@ async function main() {
 			}
 		}
 
-		const content = toTiptapDocJson(plainText);
+		const content = toMarkdown(plainText);
 		const saved = await entriesService.update({
 			id: entry.id,
 			userId: user.id,

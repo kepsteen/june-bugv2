@@ -35,7 +35,7 @@ const entriesServiceRaw = {
     const [created] = await db.insert(entries).values({
       userId,
       entryDate: date,
-      content: JSON.stringify({ type: 'doc', content: [] }),
+      content: '',
       plainText: '',
     }).returning();
 

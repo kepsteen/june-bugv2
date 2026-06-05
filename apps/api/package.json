@@ -9,6 +9,7 @@
     "worker:memory": "tsx src/workers/memory-worker.ts",
     "script:generate-entries": "tsx src/scripts/generate-entries.ts",
     "script:backfill-memory-embeddings": "tsx src/scripts/backfill-memory-embeddings.ts",
+    "script:migrate-tiptap-to-markdown": "tsx src/scripts/migrate-tiptap-to-markdown.ts",
     "test": "vitest",
     "test:ui": "vitest --ui",
     "test:run": "vitest run",

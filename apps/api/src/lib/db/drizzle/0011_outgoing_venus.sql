@@ -1,0 +1,1 @@
+ALTER TABLE "entries" ALTER COLUMN "content" SET DEFAULT '';

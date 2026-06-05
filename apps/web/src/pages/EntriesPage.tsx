@@ -7,7 +7,7 @@ import { PanelLeft, Search, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { EntriesSidebar } from '@/components/sidebar/EntriesSidebar';
 import { PromptsSidebar, promptCategories } from '@/components/sidebar/PromptsSidebar';
-import { TiptapEditor } from '@/components/editor/TiptapEditor';
+import { MarkdownEditor } from '@/components/editor/MarkdownEditor';
 import { SearchDialog } from '@/components/SearchDialog';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { ThemeToggle } from '@/components/ThemeToggle';
@@ -328,7 +328,7 @@ export function EntriesPage() {
                   <div className="text-sm text-muted-foreground">Loading entry...</div>
                 </div>
               ) : currentEntry ? (
-                <TiptapEditor
+                <MarkdownEditor
                   key={currentEntry.id}
                   entryId={currentEntry.id}
                   initialContent={currentEntry.content}

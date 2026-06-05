@@ -17,7 +17,7 @@ export const entries = pgTable(
       .notNull()
       .references(() => appUsers.id, { onDelete: 'cascade' }),
     entryDate: timestamp('entry_date').notNull(),
-    content: text('content').notNull().default('{"type":"doc","content":[]}'),
+    content: text('content').notNull().default(''),
     plainText: text('plain_text').default(''),
     Title: text('title'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
