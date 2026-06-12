@@ -405,9 +405,6 @@ export interface QueueOverview {
     outcome: string;
     count: number;
   }[];
-  rabbitMq: {
-    enabled: boolean;
-  };
 }
 
 export interface PlatformOverview {

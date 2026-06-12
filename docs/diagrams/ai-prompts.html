@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI &amp; Prompts — JuneBug v2</title>
+  <link rel="stylesheet" href="shared.css">
+</head>
+<body>
+  <header class="site-header">
+    <h1>JuneBug v2 System Diagrams</h1>
+    <nav class="site-nav">
+      <a href="index.html">Overview</a>
+      <a href="auth-identity.html">Auth</a>
+      <a href="entries.html">Entries</a>
+      <a href="memory.html">Memory</a>
+      <a href="ai-prompts.html" class="active">AI &amp; Prompts</a>
+      <a href="frontend.html">Frontend</a>
+      <a href="infrastructure.html">Infrastructure</a>
+    </nav>
+  </header>
+
+  <main>
+    <h1 class="page-title">AI Integration &amp; Personalized Prompts</h1>
+    <p class="page-subtitle">
+      Centralized AI service via Vercel AI SDK and AI Gateway. Powers title generation, memory extraction,
+      embeddings, and personalized journaling prompts — all with heuristic fallbacks.
+    </p>
+
+    <div class="diagram-card">
+      <h2>AI Service Layer</h2>
+      <svg class="diagram-svg" viewBox="0 0 860 340" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
+            <path d="M0,0 L8,3 L0,6 Z" fill="#6b6358"/>
+          </marker>
+        </defs>
+
+        <!-- Consumers -->
+        <rect x="20" y="30" width="820" height="70" rx="8" fill="oklch(0.85 0.08 78.86)" stroke="#6b6358"/>
+        <text x="40" y="55" font-family="Nunito,sans-serif" font-size="11" font-weight="600">Consumers</text>
+        <rect x="50" y="65" width="110" height="28" rx="4" fill="white" stroke="#6b6358"/>
+        <text x="105" y="84" text-anchor="middle" font-family="Nunito,sans-serif" font-size="9">entries (title)</text>
+        <rect x="175" y="65" width="130" height="28" rx="4" fill="white" stroke="#6b6358"/>
+        <text x="240" y="84" text-anchor="middle" font-family="Nunito,sans-serif" font-size="9">memory pipeline</text>
+        <rect x="320" y="65" width="110" height="28" rx="4" fill="white" stroke="#6b6358"/>
+        <text x="375" y="84" text-anchor="middle" font-family="Nunito,sans-serif" font-size="9">embeddings</text>
+        <rect x="445" y="65" width="110" height="28" rx="4" fill="white" stroke="#6b6358"/>
+        <text x="500" y="84" text-anchor="middle" font-family="Nunito,sans-serif" font-size="9">prompts</text>
+        <rect x="570" y="65" width="130" height="28" rx="4" fill="white" stroke="#6b6358"/>
+        <text x="635" y="84" text-anchor="middle" font-family="Nunito,sans-serif" font-size="9">observability</text>
+
+        <!-- AI Service -->
+        <rect x="280" y="130" width="300" height="100" rx="10" fill="white" stroke="#6b6358" stroke-width="2"/>
+        <text x="430" y="155" text-anchor="middle" font-family="Nunito,sans-serif" font-size="12" font-weight="700">ai.service.ts</text>
+        <text x="300" y="180" font-family="JetBrains Mono,monospace" font-size="9">generateTitle()          → gpt-4o-mini</text>
+        <text x="300" y="198" font-family="JetBrains Mono,monospace" font-size="9">extractMemoriesFromEntry() → gpt-4o-mini</text>
+        <text x="300" y="216" font-family="JetBrains Mono,monospace" font-size="9">embedText()              → text-embedding-3-small</text>
+
+        <line x1="430" y1="100" x2="430" y2="130" stroke="#6b6358" marker-end="url(#arrow)"/>
+
+        <!-- Gateway -->
+        <rect x="280" y="260" width="300" height="60" rx="8" fill="oklch(0.90 0.04 79.64)" stroke="#6b6358" stroke-dasharray="5"/>
+        <text x="430" y="285" text-anchor="middle" font-family="Nunito,sans-serif" font-size="11" font-weight="600">Vercel AI Gateway</text>
+        <text x="430" y="305" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="9">AI_GATEWAY_API_KEY</text>
+
+        <line x1="430" y1="230" x2="430" y2="260" stroke="#6b6358" marker-end="url(#arrow)"/>
+
+        <!-- Fallback -->
+        <rect x="620" y="150" width="200" height="80" rx="8" fill="oklch(0.87 0.07 95)" stroke="#6b6358"/>
+        <text x="720" y="175" text-anchor="middle" font-family="Nunito,sans-serif" font-size="10" font-weight="600">Fallbacks</text>
+        <text x="720" y="195" text-anchor="middle" font-family="Nunito,sans-serif" font-size="9">Heuristic extraction</text>
+        <text x="720" y="213" text-anchor="middle" font-family="Nunito,sans-serif" font-size="9">deterministic-hash-v1</text>
+        <line x1="580" y1="180" x2="620" y2="180" stroke="#6b6358" stroke-dasharray="4" marker-end="url(#arrow)"/>
+        <text x="590" y="172" font-family="Nunito,sans-serif" font-size="8" fill="#6b6358">if no key</text>
+      </svg>
+    </div>
+
+    <div class="diagram-card">
+      <h2>Personalized Prompts Flow</h2>
+      <svg class="diagram-svg" viewBox="0 0 860 300" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <marker id="arrow2" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
+            <path d="M0,0 L8,3 L0,6 Z" fill="#6b6358"/>
+          </marker>
+        </defs>
+
+        <rect x="30" y="40" width="150" height="60" rx="8" fill="oklch(0.88 0.06 111.96)" stroke="#6b6358"/>
+        <text x="105" y="65" text-anchor="middle" font-family="Nunito,sans-serif" font-size="10" font-weight="600">PromptsSidebar</text>
+        <text x="105" y="85" text-anchor="middle" font-family="Nunito,sans-serif" font-size="9">4 focus categories</text>
+
+        <rect x="220" y="40" width="160" height="60" rx="8" fill="oklch(0.85 0.08 78.86)" stroke="#6b6358"/>
+        <text x="300" y="65" text-anchor="middle" font-family="Nunito,sans-serif" font-size="10" font-weight="600">promptsService</text>
+        <text x="300" y="85" text-anchor="middle" font-family="Nunito,sans-serif" font-size="9">getOrCreateForEntry()</text>
+
+        <rect x="420" y="30" width="140" height="80" rx="8" fill="oklch(0.82 0.06 84.56)" stroke="#6b6358"/>
+        <text x="490" y="55" text-anchor="middle" font-family="Nunito,sans-serif" font-size="10" font-weight="600">entry_prompts</text>
+        <text x="490" y="75" text-anchor="middle" font-family="Nunito,sans-serif" font-size="9">cache per entry</text>
+        <text x="490" y="95" text-anchor="middle" font-family="Nunito,sans-serif" font-size="9">+ category</text>
+
+        <rect x="590" y="40" width="160" height="60" rx="8" fill="oklch(0.85 0.08 78.86)" stroke="#6b6358"/>
+        <text x="670" y="65" text-anchor="middle" font-family="Nunito,sans-serif" font-size="10" font-weight="600">memoriesService</text>
+        <text x="670" y="85" text-anchor="middle" font-family="Nunito,sans-serif" font-size="9">generatePersonalizedPrompts()</text>
+
+        <rect x="590" y="140" width="160" height="60" rx="8" fill="white" stroke="#6b6358"/>
+        <text x="670" y="165" text-anchor="middle" font-family="Nunito,sans-serif" font-size="10" font-weight="600">aiService</text>
+        <text x="670" y="185" text-anchor="middle" font-family="Nunito,sans-serif" font-size="9">3–5 prompt suggestions</text>
+
+        <line x1="180" y1="70" x2="220" y2="70" stroke="#6b6358" marker-end="url(#arrow2)"/>
+        <line x1="380" y1="70" x2="420" y2="70" stroke="#6b6358" marker-end="url(#arrow2)"/>
+        <text x="395" y="62" font-family="Nunito,sans-serif" font-size="8" fill="#6b6358">cache hit?</text>
+        <line x1="490" y1="110" x2="490" y2="130" stroke="#6b6358" marker-end="url(#arrow2)"/>
+        <line x1="490" y1="130" x2="670" y2="130" stroke="#6b6358"/>
+        <line x1="670" y1="130" x2="670" y2="140" stroke="#6b6358" marker-end="url(#arrow2)"/>
+        <text x="560" y="125" font-family="Nunito,sans-serif" font-size="8" fill="#6b6358">cache miss</text>
+
+        <!-- Categories -->
+        <rect x="30" y="160" width="500" height="110" rx="8" fill="white" stroke="#6b6358"/>
+        <text x="50" y="185" font-family="Nunito,sans-serif" font-size="11" font-weight="600">Focus Categories</text>
+        <rect x="50" y="200" width="100" height="50" rx="6" fill="oklch(0.88 0.06 111.96)" stroke="#6b6358"/>
+        <text x="100" y="230" text-anchor="middle" font-family="Nunito,sans-serif" font-size="10">goal</text>
+        <rect x="165" y="200" width="100" height="50" rx="6" fill="oklch(0.88 0.06 111.96)" stroke="#6b6358"/>
+        <text x="215" y="230" text-anchor="middle" font-family="Nunito,sans-serif" font-size="10">win</text>
+        <rect x="280" y="200" width="100" height="50" rx="6" fill="oklch(0.88 0.06 111.96)" stroke="#6b6358"/>
+        <text x="330" y="230" text-anchor="middle" font-family="Nunito,sans-serif" font-size="10">blocker</text>
+        <rect x="395" y="200" width="100" height="50" rx="6" fill="oklch(0.88 0.06 111.96)" stroke="#6b6358"/>
+        <text x="445" y="230" text-anchor="middle" font-family="Nunito,sans-serif" font-size="10">learning</text>
+      </svg>
+    </div>
+
+    <div class="info-grid">
+      <div class="info-box">
+        <h3>Models Used</h3>
+        <ul>
+          <li>gpt-4o-mini (text generation)</li>
+          <li>text-embedding-3-small</li>
+          <li>deterministic-hash-v1 (fallback)</li>
+        </ul>
+      </div>
+      <div class="info-box">
+        <h3>Observability</h3>
+        <ul>
+          <li>recordAiUsage() on every call</li>
+          <li>Feature tags: entry_title,</li>
+          <li>memory_extraction, personalized_prompts</li>
+        </ul>
+      </div>
+      <div class="info-box">
+        <h3>API Endpoints</h3>
+        <ul>
+          <li>POST /api/prompts/personalized</li>
+          <li>POST /api/prompts/personalized/regenerate</li>
+          <li>POST /api/entries/:id/title</li>
+        </ul>
+      </div>
+    </div>
+  </main>
+  <footer>Generated from codebase exploration — JuneBug v2</footer>
+</body>
+</html>

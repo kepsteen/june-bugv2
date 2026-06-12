@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Auth &amp; Identity — JuneBug v2</title>
+  <link rel="stylesheet" href="shared.css">
+</head>
+<body>
+  <header class="site-header">
+    <h1>JuneBug v2 System Diagrams</h1>
+    <nav class="site-nav">
+      <a href="index.html">Overview</a>
+      <a href="auth-identity.html" class="active">Auth</a>
+      <a href="entries.html">Entries</a>
+      <a href="memory.html">Memory</a>
+      <a href="ai-prompts.html">AI &amp; Prompts</a>
+      <a href="frontend.html">Frontend</a>
+      <a href="infrastructure.html">Infrastructure</a>
+    </nav>
+  </header>
+
+  <main>
+    <h1 class="page-title">Authentication &amp; Identity</h1>
+    <p class="page-subtitle">
+      Session-based auth via Better Auth with a dual-user model: Better Auth manages credentials and sessions;
+      <code>app_users</code> stores journaling profile, onboarding state, and admin flags.
+    </p>
+
+    <div class="diagram-card">
+      <h2>Dual User Model</h2>
+      <svg class="diagram-svg" viewBox="0 0 860 380" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
+            <path d="M0,0 L8,3 L0,6 Z" fill="#6b6358"/>
+          </marker>
+        </defs>
+
+        <!-- Browser -->
+        <rect x="30" y="30" width="180" height="70" rx="8" fill="oklch(0.88 0.06 111.96)" stroke="#6b6358"/>
+        <text x="120" y="60" text-anchor="middle" font-family="Nunito,sans-serif" font-size="12" font-weight="600">Browser</text>
+        <text x="120" y="80" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="9">credentials: include</text>
+
+        <!-- Better Auth client -->
+        <rect x="260" y="20" width="160" height="90" rx="8" fill="white" stroke="#6b6358"/>
+        <text x="340" y="50" text-anchor="middle" font-family="Nunito,sans-serif" font-size="11" font-weight="600">auth-client.ts</text>
+        <text x="340" y="70" text-anchor="middle" font-family="Nunito,sans-serif" font-size="9">useSession()</text>
+        <text x="340" y="88" text-anchor="middle" font-family="Nunito,sans-serif" font-size="9">signIn · signUp · signOut</text>
+
+        <!-- Better Auth handler -->
+        <rect x="480" y="20" width="180" height="90" rx="8" fill="oklch(0.85 0.08 78.86)" stroke="#6b6358"/>
+        <text x="570" y="50" text-anchor="middle" font-family="Nunito,sans-serif" font-size="11" font-weight="600">Better Auth Handler</text>
+        <text x="570" y="70" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="9">/api/auth/*</text>
+        <text x="570" y="88" text-anchor="middle" font-family="Nunito,sans-serif" font-size="9">Drizzle adapter</text>
+
+        <!-- Auth tables -->
+        <rect x="700" y="10" width="140" height="110" rx="8" fill="oklch(0.82 0.06 84.56)" stroke="#6b6358"/>
+        <text x="770" y="35" text-anchor="middle" font-family="Nunito,sans-serif" font-size="10" font-weight="600">Better Auth Tables</text>
+        <text x="770" y="55" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="9">user</text>
+        <text x="770" y="72" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="9">session</text>
+        <text x="770" y="89" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="9">account</text>
+        <text x="770" y="106" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="9">verification</text>
+
+        <line x1="210" y1="65" x2="260" y2="65" stroke="#6b6358" marker-end="url(#arrow)"/>
+        <line x1="420" y1="65" x2="480" y2="65" stroke="#6b6358" marker-end="url(#arrow)"/>
+        <line x1="660" y1="65" x2="700" y2="65" stroke="#6b6358" marker-end="url(#arrow)"/>
+
+        <!-- Protected route flow -->
+        <rect x="30" y="160" width="810" height="200" rx="10" fill="white" stroke="#6b6358" stroke-width="1.5"/>
+        <text x="50" y="185" font-family="Nunito,sans-serif" font-size="12" font-weight="700">Protected Route Flow</text>
+
+        <rect x="50" y="200" width="120" height="45" rx="6" fill="oklch(0.88 0.06 111.96)" stroke="#6b6358"/>
+        <text x="110" y="228" text-anchor="middle" font-family="Nunito,sans-serif" font-size="10">API Request</text>
+
+        <rect x="200" y="200" width="130" height="45" rx="6" fill="oklch(0.85 0.08 78.86)" stroke="#6b6358"/>
+        <text x="265" y="222" text-anchor="middle" font-family="Nunito,sans-serif" font-size="10">AuthMiddleware</text>
+        <text x="265" y="236" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="8">getSession()</text>
+
+        <rect x="360" y="200" width="150" height="45" rx="6" fill="oklch(0.85 0.08 78.86)" stroke="#6b6358"/>
+        <text x="435" y="222" text-anchor="middle" font-family="Nunito,sans-serif" font-size="10">appUsersService</text>
+        <text x="435" y="236" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="8">findOrCreate()</text>
+
+        <rect x="540" y="200" width="120" height="45" rx="6" fill="oklch(0.85 0.08 78.86)" stroke="#6b6358"/>
+        <text x="600" y="228" text-anchor="middle" font-family="Nunito,sans-serif" font-size="10">Feature Route</text>
+
+        <rect x="690" y="200" width="130" height="45" rx="6" fill="oklch(0.82 0.06 84.56)" stroke="#6b6358"/>
+        <text x="755" y="228" text-anchor="middle" font-family="Nunito,sans-serif" font-size="10">Domain Tables</text>
+
+        <line x1="170" y1="222" x2="200" y2="222" stroke="#6b6358" marker-end="url(#arrow)"/>
+        <line x1="330" y1="222" x2="360" y2="222" stroke="#6b6358" marker-end="url(#arrow)"/>
+        <line x1="510" y1="222" x2="540" y2="222" stroke="#6b6358" marker-end="url(#arrow)"/>
+        <line x1="660" y1="222" x2="690" y2="222" stroke="#6b6358" marker-end="url(#arrow)"/>
+
+        <!-- app_users table -->
+        <rect x="200" y="280" width="200" height="60" rx="8" fill="oklch(0.82 0.06 84.56)" stroke="#6b6358"/>
+        <text x="300" y="305" text-anchor="middle" font-family="Nunito,sans-serif" font-size="11" font-weight="600">app_users</text>
+        <text x="300" y="325" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="9">auth_id → user.id</text>
+
+        <rect x="460" y="280" width="200" height="60" rx="8" fill="oklch(0.82 0.06 84.56)" stroke="#6b6358"/>
+        <text x="560" y="305" text-anchor="middle" font-family="Nunito,sans-serif" font-size="11" font-weight="600">Onboarding Fields</text>
+        <text x="560" y="325" text-anchor="middle" font-family="Nunito,sans-serif" font-size="9">isOnboarded · isAdmin · preferences</text>
+
+        <line x1="435" y1="245" x2="300" y2="280" stroke="#6b6358" marker-end="url(#arrow)"/>
+        <line x1="400" y1="310" x2="460" y2="310" stroke="#6b6358" marker-end="url(#arrow)"/>
+
+        <!-- GitHub OAuth -->
+        <rect x="50" y="280" width="120" height="60" rx="8" fill="oklch(0.90 0.04 79.64)" stroke="#6b6358" stroke-dasharray="4"/>
+        <text x="110" y="305" text-anchor="middle" font-family="Nunito,sans-serif" font-size="10" font-weight="600">GitHub OAuth</text>
+        <text x="110" y="325" text-anchor="middle" font-family="Nunito,sans-serif" font-size="9">optional</text>
+        <line x1="570" y1="110" x2="110" y2="280" stroke="#6b6358" stroke-dasharray="4" marker-end="url(#arrow)"/>
+      </svg>
+    </div>
+
+    <div class="info-grid">
+      <div class="info-box">
+        <h3>Key Backend Files</h3>
+        <ul>
+          <li>features/auth/auth.ts</li>
+          <li>middleware/auth-middleware.ts</li>
+          <li>features/app-users/app-users.service.ts</li>
+          <li>features/users/users.routes.ts</li>
+        </ul>
+      </div>
+      <div class="info-box">
+        <h3>Key Frontend Files</h3>
+        <ul>
+          <li>lib/auth-client.ts</li>
+          <li>pages/SignInPage.tsx</li>
+          <li>pages/OnboardingPage.tsx</li>
+          <li>App.tsx (ProtectedRoute)</li>
+        </ul>
+      </div>
+      <div class="info-box">
+        <h3>External Dependencies</h3>
+        <ul>
+          <li>Neon Postgres (sessions)</li>
+          <li>GitHub OAuth (optional)</li>
+          <li>Resend (password reset)</li>
+        </ul>
+      </div>
+    </div>
+  </main>
+  <footer>Generated from codebase exploration — JuneBug v2</footer>
+</body>
+</html>

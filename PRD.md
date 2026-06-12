@@ -74,7 +74,7 @@ A web-first, mobile-responsive journaling app for developers that:
 - **Storage:** Content should continue to be stored as both structured content and `plainText` for search. If staying on Tiptap, Markdown serialization is handled by `@tiptap/pm`. If switching editors, a serialization strategy for search indexing must be defined.
 
 ### Memory Pipeline
-- Memory extraction is triggered on entry create/update via a RabbitMQ job (when configured) or synchronously in dev.
+- Memory extraction is triggered on entry create/update via inline fire-and-forget processing in the API process.
 - For MVP, the Settings > Memories tab exposes read-only memory cards with a delete action — matching what is already partially implemented.
 - Full memory editing (rename, merge, annotate) is explicitly out of scope for MVP.
 
@@ -130,4 +130,4 @@ A web-first, mobile-responsive journaling app for developers that:
 
 - The shift from Tiptap block editor to Markdown is the biggest open design decision. It touches the editor component, content storage format, serialization, and how prompts are surfaced. This decision should be prototyped before the rest of the frontend work is scoped.
 - The existing `~/repos/june-bug` Convex implementation is a useful reference for original UX intent and prior design decisions.
-- RabbitMQ is optional — the memory pipeline degrades to synchronous processing when `RABBITMQ_URL` is not set, which is acceptable for MVP scale.
+- Memory extraction runs inline (fire-and-forget with retries) in the API process — no separate queue or worker required at MVP scale.

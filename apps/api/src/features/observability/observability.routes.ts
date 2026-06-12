@@ -11,8 +11,6 @@ import {
   aiUsageFeatureEnum,
   aiUsageStatusEnum,
 } from './observability.table.js';
-import { isRabbitMqEnabled } from '@/lib/queue/rabbitmq.js';
-
 const router: RouterType = Router();
 
 // AI Overview - aggregate stats
@@ -101,16 +99,7 @@ router.get(
   validateQuery(queueOverviewQuerySchema),
   asyncHandler(async (req: Request, res: Response) => {
     const hours = Number(req.query.hours) || 24;
-    const dbOverview = await observabilityService.getQueueOverview(hours);
-
-    // Add RabbitMQ health status
-    const overview = {
-      ...dbOverview,
-      rabbitMq: {
-        enabled: isRabbitMqEnabled(),
-      },
-    };
-
+    const overview = await observabilityService.getQueueOverview(hours);
     res.json({ data: overview });
   }),
 );

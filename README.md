@@ -31,23 +31,17 @@ flowchart LR
     Express[Express]
     Auth[Better Auth]
   end
-  subgraph data [Data and async]
+  subgraph data [Data and AI]
     PG[(Neon Postgres)]
-    RMQ[RabbitMQ]
-    Worker[Memory worker]
     OpenAI[OpenAI API]
   end
   SPA --> Express
   Express --> Auth
   Express --> PG
-  Express --> RMQ
-  RMQ --> Worker
-  Worker --> PG
-  Worker --> OpenAI
   Express --> OpenAI
 ```
 
-When RabbitMQ is configured, entry changes can enqueue work for the memory pipeline; otherwise synchronous paths still exist for core flows. Optional integrations (S3-style uploads, Resend email) are wired at the environment level where present.
+Entry changes trigger memory extraction inline in the API process (fire-and-forget with retries). Optional integrations (S3-style uploads, Resend email) are wired at the environment level where present.
 
 ## Tech stack
 
@@ -58,7 +52,6 @@ When RabbitMQ is configured, entry changes can enqueue work for the memory pipel
 | Database | Neon Postgres (serverless driver) |
 | Auth | Better Auth (email/password, GitHub OAuth) |
 | AI | Vercel AI SDK + OpenAI (titles, memory extraction, prompt suggestions) |
-| Queue | RabbitMQ (async memory pipeline) |
 | Testing | Vitest, Testing Library |
 
 ## Getting started
@@ -76,7 +69,7 @@ When RabbitMQ is configured, entry changes can enqueue work for the memory pipel
    - `DATABASE_URL` — Postgres connection string  
    - `BETTER_AUTH_SECRET` — at least 32 characters (e.g. `openssl rand -hex 32`)
 
-   Optional variables cover GitHub OAuth, AI keys (see `apps/api/src/lib/ai/` and `CLAUDE.md`), S3 uploads, RabbitMQ, and email. Core journaling works without optional services; AI-heavy features need the corresponding keys.
+   Optional variables cover GitHub OAuth, AI keys (see `apps/api/src/lib/ai/` and `CLAUDE.md`), S3 uploads, and email. Core journaling works without optional services; AI-heavy features need the corresponding keys.
 
 3. Apply the schema to your database (development):
 
@@ -97,7 +90,7 @@ When RabbitMQ is configured, entry changes can enqueue work for the memory pipel
 ```
 june-bugv2/
 ├── apps/
-│   ├── api/          # Express backend, Drizzle schema, workers
+│   ├── api/          # Express backend, Drizzle schema, scripts
 │   └── web/          # React + Vite frontend
 ├── packages/
 │   └── shared/       # Shared types

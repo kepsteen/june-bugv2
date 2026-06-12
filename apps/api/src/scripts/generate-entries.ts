@@ -1,5 +1,4 @@
 import "dotenv/config";
-import { randomUUID } from "node:crypto";
 import { and, eq, gte, lte } from "drizzle-orm";
 import { generateText, Output } from "ai";
 import z from "zod";
@@ -10,10 +9,6 @@ import {
 } from "@/features/app-users/app-users.table.js";
 import { entries } from "@/features/entries/entries.table.js";
 import { entriesService } from "@/features/entries/entries.service.js";
-import { memoriesPipelineService } from "@/features/memories/memory-pipeline.service.js";
-import { closeRabbitMq, isRabbitMqEnabled } from "@/lib/queue/rabbitmq.js";
-import { MEMORY_JOB_VERSION } from "@/lib/queue/memory-queue.js";
-
 /**
  * Generate onboarding-aware journal entries for an existing app user.
  *
@@ -37,7 +32,6 @@ import { MEMORY_JOB_VERSION } from "@/lib/queue/memory-queue.js";
  * - --overwrite <true|false>      Overwrite non-empty entries (default: false)
  * - --run <true|false>            Execute writes (default: false)
  * - --dry-run <true|false>        Compatibility alias; inverse of --run
- * - --inline-memory <true|false>  Process memory extraction inline after save
  */
 type ArgMap = Record<string, string | boolean>;
 
@@ -248,30 +242,6 @@ async function resolveUser(args: ArgMap): Promise<AppUser> {
 	throw new Error(`No app user found for --email ${email}`);
 }
 
-async function maybeProcessMemoryInline({
-	userId,
-	entryId,
-	entryUpdatedAt,
-	enabled,
-}: {
-	userId: string;
-	entryId: string;
-	entryUpdatedAt: string;
-	enabled: boolean;
-}) {
-	if (!enabled) return;
-
-	await memoriesPipelineService.processEntryChangedJob({
-		payload: {
-			jobVersion: MEMORY_JOB_VERSION,
-			jobId: randomUUID(),
-			userId,
-			entryId,
-			entryUpdatedAt,
-		},
-	});
-}
-
 async function main() {
 	const args = parseArgs(process.argv.slice(2));
 	if (args.help || args.h) {
@@ -295,7 +265,6 @@ async function main() {
 				"  --overwrite <true|false>       Default: false",
 				"  --run <true|false>             Default: false (must be true to write entries)",
 				"  --dry-run <true|false>         Compatibility alias; inverse of --run",
-				"  --inline-memory <true|false>   Default: true when RabbitMQ disabled, false otherwise",
 			].join("\n"),
 		);
 		return;
@@ -322,8 +291,6 @@ async function main() {
 		? parseBoolean(args.run, false)
 		: !parseBoolean(args["dry-run"], true);
 	const dryRun = !shouldRun;
-	const inlineMemoryDefault = !isRabbitMqEnabled();
-	const inlineMemory = parseBoolean(args["inline-memory"], inlineMemoryDefault);
 	const canUseAiGateway = hasAiGatewayKey();
 
 	const dates = iterateDatesInclusive(start, end);
@@ -336,7 +303,7 @@ async function main() {
 		[
 			`Generating entries for user ${user.id} (${user.email ?? "no-email"})`,
 			`Date range: ${formatDateIso(start)} -> ${formatDateIso(end)} (${dates.length} days)`,
-			`Options: overwrite=${overwrite} run=${shouldRun} dryRun=${dryRun} inlineMemory=${inlineMemory} aiGateway=${canUseAiGateway}`,
+			`Options: overwrite=${overwrite} run=${shouldRun} dryRun=${dryRun} aiGateway=${canUseAiGateway}`,
 		].join("\n"),
 	);
 
@@ -421,7 +388,7 @@ async function main() {
 		}
 
 		const content = toMarkdown(plainText);
-		const saved = await entriesService.update({
+		await entriesService.update({
 			id: entry.id,
 			userId: user.id,
 			data: {
@@ -430,15 +397,8 @@ async function main() {
 			},
 		});
 
-		await maybeProcessMemoryInline({
-			userId: user.id,
-			entryId: saved.id,
-			entryUpdatedAt: saved.updatedAt.toISOString(),
-			enabled: inlineMemory,
-		});
-
 		updated += 1;
-		console.log(`[${formatDateIso(date)}] Updated entry ${saved.id}`);
+		console.log(`[${formatDateIso(date)}] Updated entry ${entry.id}`);
 	}
 
 	console.log("\nDone.");
@@ -458,7 +418,5 @@ void (async () => {
 			console.error(String(error));
 		}
 		process.exitCode = 1;
-	} finally {
-		await closeRabbitMq().catch(() => undefined);
 	}
 })();

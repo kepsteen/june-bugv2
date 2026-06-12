@@ -21,9 +21,6 @@ const envSchema = z.object({
   AWS_REGION: z.string().default('us-east-1'),
   AWS_S3_BUCKET: z.string().optional(),
 
-  // RabbitMQ
-  RABBITMQ_URL: z.string().optional(),
-
   // Resend
   RESEND_API_KEY: z.string().optional(),
   EMAIL_FROM: z.string().optional(),

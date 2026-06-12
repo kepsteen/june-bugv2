@@ -1,12 +1,11 @@
-import { CheckCircle, RefreshCw, Server, XCircle } from "lucide-react";
+import { CheckCircle, RefreshCw, XCircle } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import type { QueueOverview } from "@/lib/api";
 import { SectionHeader } from "./SectionHeader";
 import { formatLabel } from "@/lib/utils";
 
 export function QueueOverviewCards({ data }: { data: QueueOverview }) {
-  const { totals, statusBreakdown, outcomeBreakdown, rabbitMq, period } = data;
+  const { totals, statusBreakdown, outcomeBreakdown, period } = data;
   const completedCount =
     statusBreakdown.find((status) => status.status === "completed")?.count || 0;
   const failedCount =
@@ -22,14 +21,8 @@ export function QueueOverviewCards({ data }: { data: QueueOverview }) {
   return (
     <div className="space-y-4">
       <SectionHeader
-        title="Queue Health Overview"
-        description={`Last ${period.hours} hours (since ${new Date(period.since).toLocaleString()})`}
-        rightSlot={
-          <Badge variant={rabbitMq.enabled ? "default" : "secondary"}>
-            <Server className="mr-1 h-3 w-3" />
-            {rabbitMq.enabled ? "RabbitMQ Enabled" : "RabbitMQ Disabled"}
-          </Badge>
-        }
+        title="Memory Job Overview"
+        description={`Last ${period.hours} hours (since ${new Date(period.since).toLocaleString()}) — inline processing`}
       />
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">

@@ -19,7 +19,7 @@ The custom system already includes JuneBug-specific assets:
 
 - Developer taxonomy (`goal`, `project`, `blocker`, `win`, `learning`, etc.)
 - Retrieval scoring tuned for prompt generation (importance, confidence, freshness decay, category momentum)
-- Event-sourced idempotency via `memory_events` and RabbitMQ jobs
+- Event-sourced idempotency via `memory_events` and inline memory jobs
 - Freemium gating and AI usage observability integrated with `app_users`
 
 The main quality gap was not architectural: embeddings were placeholders (`deterministic-hash-v1`) rather than real semantic vectors.

@@ -47,7 +47,6 @@ Optional (features degrade gracefully without them):
 - `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` — GitHub OAuth
 - `OPENAI_API_KEY` — AI title generation
 - `AWS_*` + `AWS_S3_BUCKET` — File uploads
-- `RABBITMQ_URL` — Background jobs
 - `RESEND_API_KEY` — Email
 
 ## Database: Creating & Migrating
@@ -119,3 +118,21 @@ Every authenticated route resolves the app user via `appUsersService.findOrCreat
 **Editor**: Tiptap v3 with custom slash commands (`/`) implemented via `@tiptap/suggestion` + tippy.js. The slash command list component is in `src/components/editor/`. Tippy is configured with `theme: 'none'` and `arrow: false` to avoid rendering its own dark box.
 
 **Entries model**: One entry per user per calendar date (enforced by a unique index). `POST /api/entries` is idempotent — it calls `createOrGetByDate` and returns the existing entry if one already exists for that date.
+
+## Design Context
+
+Guidance for any UI/design work. The canonical copy lives in `.impeccable.md` at the repo root (used by the `impeccable` design skill); keep the two in sync.
+
+**Users**: Developers who keep a daily journal — one entry per calendar day, with AI-assisted titles, "memories," and personalized prompts. The job is **reflection, not productivity tracking**. Sessions often happen at night, so the UI must be comfortable in low light and never demanding.
+
+**Brand personality**: Warm, gentle, human. The interface should make the user feel **calm and safe** — a quiet, low-pressure space to think. Personality (the "june bug" mascot, the happy-wiggle, the floating logo button) shows up in *restraint and small touches*, not loudness.
+
+**Aesthetic direction** — keep and refine the current warm, organic look; do not redesign the brand:
+
+- **Palette**: warm sand/cream neutrals (light) and warm dark-brown (dark), olive/sage **green primary**, amber-leaning accents. Authored in **OKLCH** in `apps/web/src/index.css`, with neutrals tinted toward the warm brand hue (~80). Never introduce cold grays, pure `#000`/`#fff`, or the cyan-on-dark / purple-gradient "AI" palette.
+- **Type**: Nunito (sans / UI + body), PT Serif (serif, for editorial/journal reading), JetBrains Mono (code & metadata). Favor the serif in entry-reading moments; keep UI chrome in Nunito.
+- **Shape**: soft rounded corners (`--radius: 0.625rem`), gentle borders, the notched editor panel. Tactile and cozy like a worn notebook — not glassy, neon, or flat-corporate.
+- **Themes**: support **both**; dark mode must feel genuinely warm (brown, not slate).
+- **Anti-references**: generic SaaS dashboards, glassmorphism, glowing dark-mode accents, gradient text, colored side-stripe borders, identical card grids, hero-metric layouts.
+
+**Design principles**: (1) calm over clever, (2) warm never cold, (3) the journal is the hero — typography and reading comfort first, (4) delight is earned and rare (respect `prefers-reduced-motion`), (5) sensible accessibility — readable contrast, visible focus states, real labels, reduced-motion fallbacks (no formal WCAG target).
