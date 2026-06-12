@@ -123,14 +123,15 @@ Every authenticated route resolves the app user via `appUsersService.findOrCreat
 
 ## Deployment (Railway single service)
 
-Production runs one Express process that serves the API and the built SPA from the same origin.
+Production runs one Express process that serves the API and the built SPA from the same origin. Railway builds with [Railpack](https://railpack.com/) via [`railway.toml`](railway.toml).
 
-- **Build:** `pnpm build:deploy` (from repo root)
-- **Start:** `pnpm start` — runs `db:migrate` then `node dist/index.js`
-- **Config:** `railway.toml` at repo root; set `PUBLIC_URL`, `DATABASE_URL`, `BETTER_AUTH_SECRET`, and optional feature keys in Railway
+- **Build:** `pnpm build:deploy` (from repo root; Railpack runs this as `buildCommand`)
+- **Migrate:** `preDeployCommand` runs `db:migrate` before each deploy
+- **Start:** `pnpm --filter @starter/api start` (`node dist/index.js`)
+- **Local prod smoke test:** `pnpm start` (migrate + start) or `pnpm build:deploy` then `node dist/index.js` from `apps/api`
+- **Config:** set `PUBLIC_URL`, `DATABASE_URL`, `BETTER_AUTH_SECRET`, and optional feature keys in Railway
+- **Railpack:** set `RAILPACK_NO_SPA=1` in Railway so Railpack does not auto-serve the Vite SPA via Caddy (Express serves it from `apps/api/public/`)
 - **Static assets:** copied to `apps/api/public/` at build time (gitignored); Express serves them with SPA fallback for client-side routing
-
-Local production smoke test: `pnpm build:deploy`, then from `apps/api` with production env vars set, `node dist/index.js`.
 
 ## Design Context
 

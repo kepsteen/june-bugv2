@@ -1,9 +1,18 @@
 [build]
-builder = "nixpacks"
-buildCommand = "pnpm install --frozen-lockfile && pnpm build:deploy"
+builder = "RAILPACK"
+buildCommand = "pnpm build:deploy"
+watchPatterns = [
+  "apps/**",
+  "packages/**",
+  "scripts/**",
+  "package.json",
+  "pnpm-lock.yaml",
+  "pnpm-workspace.yaml",
+]
 
 [deploy]
-startCommand = "pnpm start"
+preDeployCommand = ["pnpm --filter @starter/api db:migrate"]
+startCommand = "pnpm --filter @starter/api start"
 healthcheckPath = "/api/health"
 healthcheckTimeout = 30
 restartPolicyType = "ON_FAILURE"
