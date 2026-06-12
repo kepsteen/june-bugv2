@@ -57,33 +57,6 @@ router.get(
       offset: Number(offset) || 0,
     });
 
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/bb84193f-a8cf-4886-a1ac-4ac7dc26e58e', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Debug-Session-Id': '6bb92e',
-      },
-      body: JSON.stringify({
-        sessionId: '6bb92e',
-        runId: 'pre-fix',
-        hypothesisId: 'H1',
-        location: 'apps/api/src/features/observability/observability.routes.ts:/ai/events',
-        message: 'AI events payload from backend route',
-        data: {
-          count: events.length,
-          firstEventKeys: events[0] ? Object.keys(events[0]) : [],
-          firstTokensInput: events[0]?.tokensInput ?? null,
-          firstTokensOutput: events[0]?.tokensOutput ?? null,
-          firstTokensInputSnake: (events[0] as Record<string, unknown> | undefined)?.tokens_input ?? null,
-          firstTokensOutputSnake:
-            (events[0] as Record<string, unknown> | undefined)?.tokens_output ?? null,
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
-
     res.json({ data: events });
   }),
 );

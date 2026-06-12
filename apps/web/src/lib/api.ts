@@ -172,37 +172,9 @@ export const observabilityApi = {
     if (params?.endDate) searchParams.set('endDate', params.endDate);
     if (params?.limit) searchParams.set('limit', String(params.limit));
     if (params?.offset) searchParams.set('offset', String(params.offset));
-    const response = await request<{ data: AiUsageEvent[] }>(
+    return request<{ data: AiUsageEvent[] }>(
       `/api/internal/observability/ai/events?${searchParams.toString()}`,
     );
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/bb84193f-a8cf-4886-a1ac-4ac7dc26e58e', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Debug-Session-Id': '6bb92e',
-      },
-      body: JSON.stringify({
-        sessionId: '6bb92e',
-        runId: 'pre-fix',
-        hypothesisId: 'H2',
-        location: 'apps/web/src/lib/api.ts:observabilityApi.getAiEvents',
-        message: 'AI events payload at frontend API client',
-        data: {
-          count: response.data.length,
-          firstEventKeys: response.data[0] ? Object.keys(response.data[0]) : [],
-          firstTokensInput: response.data[0]?.tokensInput ?? null,
-          firstTokensOutput: response.data[0]?.tokensOutput ?? null,
-          firstTokensInputSnake:
-            (response.data[0] as Record<string, unknown> | undefined)?.tokens_input ?? null,
-          firstTokensOutputSnake:
-            (response.data[0] as Record<string, unknown> | undefined)?.tokens_output ?? null,
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
-    return response;
   },
   getQueueOverview: (hours?: number) =>
     request<{ data: QueueOverview }>(`/api/internal/observability/queues/overview?hours=${hours || 24}`),

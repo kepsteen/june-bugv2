@@ -373,37 +373,6 @@ const aiServiceRaw = {
       const textJSON = JSON.parse(aiResult.text);
       const tokenUsage = extractTokenUsage(aiResult.usage);
 
-      // #region agent log
-      const usageRecord =
-        aiResult.usage && typeof aiResult.usage === 'object'
-          ? (aiResult.usage as Record<string, unknown>)
-          : null;
-      fetch('http://127.0.0.1:7243/ingest/bb84193f-a8cf-4886-a1ac-4ac7dc26e58e', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Debug-Session-Id': '6bb92e',
-        },
-        body: JSON.stringify({
-          sessionId: '6bb92e',
-          runId: 'pre-fix',
-          hypothesisId: 'H5',
-          location: 'apps/api/src/lib/ai/ai.service.ts:generateTitle',
-          message: 'AI provider usage in generateTitle',
-          data: {
-            hasUsage: aiResult.usage != null,
-            usageKeys: usageRecord ? Object.keys(usageRecord) : [],
-            inputTokens: typeof usageRecord?.inputTokens === 'number' ? usageRecord.inputTokens : null,
-            outputTokens: typeof usageRecord?.outputTokens === 'number' ? usageRecord.outputTokens : null,
-            promptTokens: tokenUsage.promptTokens,
-            completionTokens: tokenUsage.completionTokens,
-            totalTokens: tokenUsage.totalTokens,
-          },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-      // #endregion
-
       await observabilityService.recordAiUsage({
         userId,
         feature: 'entry_title',
@@ -608,37 +577,6 @@ const aiServiceRaw = {
       const unique = new Map<string, PersonalizedPromptSuggestion>();
       for (const suggestion of prompts) unique.set(suggestion.prompt, suggestion);
       const finalized = [...unique.values()].slice(0, safeMax);
-
-      // #region agent log
-      const usageRecord =
-        aiResult.usage && typeof aiResult.usage === 'object'
-          ? (aiResult.usage as Record<string, unknown>)
-          : null;
-      fetch('http://127.0.0.1:7243/ingest/bb84193f-a8cf-4886-a1ac-4ac7dc26e58e', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Debug-Session-Id': '6bb92e',
-        },
-        body: JSON.stringify({
-          sessionId: '6bb92e',
-          runId: 'pre-fix',
-          hypothesisId: 'H5',
-          location: 'apps/api/src/lib/ai/ai.service.ts:generatePersonalizedPrompts',
-          message: 'AI provider usage in generatePersonalizedPrompts',
-          data: {
-            hasUsage: aiResult.usage != null,
-            usageKeys: usageRecord ? Object.keys(usageRecord) : [],
-            inputTokens: typeof usageRecord?.inputTokens === 'number' ? usageRecord.inputTokens : null,
-            outputTokens: typeof usageRecord?.outputTokens === 'number' ? usageRecord.outputTokens : null,
-            promptTokens: tokenUsage.promptTokens,
-            completionTokens: tokenUsage.completionTokens,
-            totalTokens: tokenUsage.totalTokens,
-          },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-      // #endregion
 
       await observabilityService.recordAiUsage({
         userId,

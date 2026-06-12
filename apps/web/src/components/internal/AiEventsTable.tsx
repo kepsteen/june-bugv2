@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useRef, useState } from "react";
+import { Fragment, useState } from "react";
 import { Link } from "react-router";
 import { Activity } from "lucide-react";
 import {
@@ -25,43 +25,6 @@ export function AiEventsTable({
   isLoading: boolean;
 }) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const lastFingerprintRef = useRef<string>("");
-
-  useEffect(() => {
-    if (isLoading || data.length === 0) return;
-    const fingerprint = `${data[0]?.id ?? "none"}:${data.length}`;
-    if (lastFingerprintRef.current === fingerprint) return;
-    lastFingerprintRef.current = fingerprint;
-    const missingTokenCount = data.filter(
-      (event) => event.tokensInput == null && event.tokensOutput == null,
-    ).length;
-    // #region agent log
-    fetch("http://127.0.0.1:7243/ingest/bb84193f-a8cf-4886-a1ac-4ac7dc26e58e", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Debug-Session-Id": "6bb92e",
-      },
-      body: JSON.stringify({
-        sessionId: "6bb92e",
-        runId: "pre-fix",
-        hypothesisId: "H3",
-        location: "apps/web/src/components/internal/AiEventsTable.tsx:useEffect",
-        message: "AI events table token render inputs",
-        data: {
-          count: data.length,
-          missingTokenCount,
-          firstEventId: data[0]?.id ?? null,
-          firstTokensInput: data[0]?.tokensInput ?? null,
-          firstTokensOutput: data[0]?.tokensOutput ?? null,
-          newestCreatedAt: data[0]?.createdAt ?? null,
-          oldestCreatedAt: data[data.length - 1]?.createdAt ?? null,
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
-  }, [data, isLoading]);
 
   if (isLoading) {
     return <TableSkeleton />;
