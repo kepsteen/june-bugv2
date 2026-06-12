@@ -1,5 +1,8 @@
 import express from 'express';
 import cors from 'cors';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import 'dotenv/config';
 import { env } from './config/env.js';
 import { corsConfig } from './config/cors.js';
@@ -19,6 +22,10 @@ import { promptsRoutes } from './features/prompts/index.js';
 import { observabilityRoutes } from './features/observability/index.js';
 
 const app = express();
+
+if (env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1);
+}
 
 app.use(cors(corsConfig));
 app.all('/api/auth/*', toNodeHandler(auth));
@@ -40,6 +47,17 @@ app.use('/api/uploads', uploadsRoutes);
 app.use('/api/memories', memoriesRoutes);
 app.use('/api/prompts', promptsRoutes);
 app.use('/api/internal/observability', observabilityRoutes);
+
+const publicDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '../public');
+if (fs.existsSync(publicDir)) {
+  app.use(express.static(publicDir));
+  app.use((req, res, next) => {
+    if (req.method !== 'GET' || req.path.startsWith('/api')) {
+      return next();
+    }
+    res.sendFile(path.join(publicDir, 'index.html'));
+  });
+}
 
 app.use(errorHandler);
 

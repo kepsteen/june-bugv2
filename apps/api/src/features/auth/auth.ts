@@ -31,6 +31,12 @@ export const auth = betterAuth({
   socialProviders,
   experimental: { joins: true },
   trustedOrigins: [env.CLIENT_URL],
+  advanced: {
+    defaultCookieAttributes: {
+      secure: env.NODE_ENV === 'production',
+      sameSite: 'lax',
+    },
+  },
 });
 
 export type Session = typeof auth.$Infer.Session;

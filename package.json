@@ -3,9 +3,15 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
+  "packageManager": "pnpm@9.8.0",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "dev": "pnpm --parallel -r dev",
     "build": "pnpm -r build",
+    "build:deploy": "pnpm --filter @starter/web build && pnpm --filter @starter/api build && node scripts/copy-web-dist.mjs",
+    "start": "pnpm --filter @starter/api db:migrate && pnpm --filter @starter/api start",
     "test": "pnpm -r test",
     "lint": "pnpm -r lint",
     "type-check": "pnpm -r type-check"

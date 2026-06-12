@@ -5,8 +5,9 @@ const envSchema = z.object({
   PORT: z.coerce.number().default(3000),
   DATABASE_URL: z.string().url(),
   BETTER_AUTH_SECRET: z.string().min(32),
+  PUBLIC_URL: z.string().url().optional(),
   BETTER_AUTH_URL: z.string().url().optional(),
-  CLIENT_URL: z.string().url().default('http://localhost:5174'),
+  CLIENT_URL: z.string().url().optional(),
 
   // GitHub OAuth
   GITHUB_CLIENT_ID: z.string().optional(),
@@ -26,5 +27,15 @@ const envSchema = z.object({
   EMAIL_FROM: z.string().optional(),
 });
 
-export const env = envSchema.parse(process.env);
-export type Env = z.infer<typeof envSchema>;
+const parsed = envSchema.parse(process.env);
+
+export const env = {
+  ...parsed,
+  CLIENT_URL: parsed.CLIENT_URL ?? parsed.PUBLIC_URL ?? 'http://localhost:5174',
+  BETTER_AUTH_URL: parsed.BETTER_AUTH_URL ?? parsed.PUBLIC_URL,
+};
+
+export type Env = z.infer<typeof envSchema> & {
+  CLIENT_URL: string;
+  BETTER_AUTH_URL: string | undefined;
+};

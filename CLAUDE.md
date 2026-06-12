@@ -18,6 +18,8 @@ Run from the **repo root** unless otherwise noted:
 - `pnpm type-check` — Type check all packages
 - `pnpm test` — Run all tests across workspaces
 - `pnpm build` — Build all packages
+- `pnpm build:deploy` — Production build: web SPA + API, copy web dist into `apps/api/public/`
+- `pnpm start` — Run migrations then start the API (serves SPA when `apps/api/public/` exists)
 - `pnpm lint` — Lint all packages
 
 Run from **`apps/api`**:
@@ -118,6 +120,17 @@ Every authenticated route resolves the app user via `appUsersService.findOrCreat
 **Editor**: Tiptap v3 with custom slash commands (`/`) implemented via `@tiptap/suggestion` + tippy.js. The slash command list component is in `src/components/editor/`. Tippy is configured with `theme: 'none'` and `arrow: false` to avoid rendering its own dark box.
 
 **Entries model**: One entry per user per calendar date (enforced by a unique index). `POST /api/entries` is idempotent — it calls `createOrGetByDate` and returns the existing entry if one already exists for that date.
+
+## Deployment (Railway single service)
+
+Production runs one Express process that serves the API and the built SPA from the same origin.
+
+- **Build:** `pnpm build:deploy` (from repo root)
+- **Start:** `pnpm start` — runs `db:migrate` then `node dist/index.js`
+- **Config:** `railway.toml` at repo root; set `PUBLIC_URL`, `DATABASE_URL`, `BETTER_AUTH_SECRET`, and optional feature keys in Railway
+- **Static assets:** copied to `apps/api/public/` at build time (gitignored); Express serves them with SPA fallback for client-side routing
+
+Local production smoke test: `pnpm build:deploy`, then from `apps/api` with production env vars set, `node dist/index.js`.
 
 ## Design Context
 
