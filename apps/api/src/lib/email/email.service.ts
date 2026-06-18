@@ -24,7 +24,6 @@ export async function sendEmail(params: {
 	}
 
 	const from = env.EMAIL_FROM ?? defaultFrom;
-	console.log("from", from);
 	const { error } = await resend.emails.send({
 		from,
 		to: params.to,

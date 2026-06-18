@@ -123,15 +123,51 @@ Every authenticated route resolves the app user via `appUsersService.findOrCreat
 
 ## Deployment (Railway single service)
 
-Production runs one Express process that serves the API and the built SPA from the same origin. Railway builds with [Railpack](https://railpack.com/) via [`railway.toml`](railway.toml).
+Production is a **single Railway service** — one Node process (Express) serves both the API and the built React SPA from the same origin. There is no separate frontend host or reverse proxy in front of the app; [`railway.toml`](railway.toml) configures the full build/deploy lifecycle via [Railpack](https://railpack.com/).
 
-- **Build:** `pnpm build:deploy` (from repo root; Railpack runs this as `buildCommand`)
-- **Migrate:** `preDeployCommand` runs `db:migrate` before each deploy
-- **Start:** `pnpm --filter @starter/api start` (`node dist/index.js`)
-- **Local prod smoke test:** `pnpm start` (migrate + start) or `pnpm build:deploy` then `node dist/index.js` from `apps/api`
-- **Config:** set `PUBLIC_URL`, `DATABASE_URL`, `BETTER_AUTH_SECRET`, and optional feature keys in Railway
-- **Railpack:** set `RAILPACK_NO_SPA=1` in Railway so Railpack does not auto-serve the Vite SPA via Caddy (Express serves it from `apps/api/public/`)
-- **Static assets:** copied to `apps/api/public/` at build time (gitignored); Express serves them with SPA fallback for client-side routing
+### How it works
+
+1. **Build** (`buildCommand`): `pnpm build:deploy` builds the Vite SPA, compiles the API (`tsc`), then copies `apps/web/dist/` → `apps/api/public/` (`scripts/copy-web-dist.mjs`).
+2. **Pre-deploy** (`preDeployCommand`): `pnpm --filter @starter/api db:migrate` applies pending Drizzle migrations before the new container goes live.
+3. **Start** (`startCommand`): `pnpm --filter @starter/api start` → `node dist/index.js` on `PORT` (Railway injects this).
+4. **Health check**: Railway polls `GET /api/health` (30s timeout). The route is defined in `apps/api/src/index.ts`.
+5. **Static + SPA routing**: When `apps/api/public/` exists, Express serves static assets and falls back to `index.html` for non-API GET requests (client-side routing).
+
+In development, the web app runs on Vite (`:5174`) and the API on Express (`:3000`). In production, both are same-origin — the SPA uses relative `/api/...` URLs (`VITE_API_URL` is unset in prod builds).
+
+### Railway environment variables
+
+Set these in the Railway dashboard (see also `.env.example` production comments):
+
+| Variable | Required | Notes |
+|----------|----------|-------|
+| `RAILPACK_NO_SPA` | Yes | `1` — prevents Railpack from auto-serving the Vite SPA via Caddy; Express serves it from `apps/api/public/` |
+| `NODE_ENV` | Yes | `production` |
+| `PUBLIC_URL` | Yes | e.g. `https://${{RAILWAY_PUBLIC_DOMAIN}}` — canonical app URL |
+| `DATABASE_URL` | Yes | Neon or Railway Postgres connection string |
+| `BETTER_AUTH_SECRET` | Yes | Min 32-char random string |
+| `BETTER_AUTH_URL` | No | Defaults to `PUBLIC_URL` |
+| `CLIENT_URL` | No | Defaults to `PUBLIC_URL` |
+| `GITHUB_CLIENT_*`, `OPENAI_API_KEY`, `AWS_*`, `RESEND_API_KEY` | No | Same optional keys as local dev |
+
+`VITE_API_URL` is **not** needed in production. GitHub OAuth callback (if enabled): `https://<your-domain>/api/auth/callback/github`.
+
+### Local production smoke test
+
+From repo root:
+
+```bash
+pnpm build:deploy   # build SPA + API, copy dist into apps/api/public/
+pnpm start          # migrate + start (same as Railway minus Railpack)
+```
+
+Or from `apps/api` after `build:deploy`: `node dist/index.js`.
+
+### `railway.toml` reference
+
+- **Builder:** `RAILPACK` (Node ≥ 22 per root `package.json` `engines`)
+- **Watch patterns:** `apps/**`, `packages/**`, `scripts/**`, lockfile/workspace manifests — redeploy on changes to these paths
+- **Restart policy:** `ON_FAILURE`, max 10 retries
 
 ## Design Context
 

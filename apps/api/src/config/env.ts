@@ -13,8 +13,8 @@ const envSchema = z.object({
   GITHUB_CLIENT_ID: z.string().optional(),
   GITHUB_CLIENT_SECRET: z.string().optional(),
 
-  // OpenAI
-  OPENAI_API_KEY: z.string().optional(),
+  // Vercel AI Gateway (routes to OpenAI and other providers)
+  AI_GATEWAY_API_KEY: z.string().optional(),
 
   // AWS S3
   AWS_ACCESS_KEY_ID: z.string().optional(),

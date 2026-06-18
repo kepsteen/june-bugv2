@@ -342,17 +342,17 @@ const aiServiceRaw = {
     const startTime = Date.now();
     const model = 'openai/gpt-4o-mini';
 
-    if (!process.env.AI_GATEWAY_API_KEY) {
+    if (!hasAiGatewayKey()) {
       await observabilityService.recordAiUsage({
         userId,
         feature: 'entry_title',
         model,
         status: 'error',
         latencyMs: Date.now() - startTime,
-        errorMessage: 'OpenAI API key not configured',
+        errorMessage: 'AI gateway API key not configured',
         requestContext: entryId ? { entryId } : undefined,
       });
-      throw new AppError('OpenAI API key not configured', 500);
+      throw new AppError('AI gateway API key not configured', 500);
     }
 
     try {
