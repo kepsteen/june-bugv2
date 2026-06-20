@@ -7,3 +7,4 @@ apps/api/public/
 .DS_Store
 pnpm-debug.log*
 apps/api/public/
+.playwright-mcp/

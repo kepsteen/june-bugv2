@@ -187,6 +187,7 @@ export function PromptsSidebar({
                 ? prompts.map((item, i) => (
                     <button
                       key={`${item.prompt}-${i}`}
+                      onMouseDown={(e) => e.preventDefault()}
                       onClick={() => onPromptClick?.(item.prompt)}
                       className="w-full text-left text-sm p-3 rounded-md border border-border hover:bg-accent hover:text-accent-foreground transition-colors"
                     >

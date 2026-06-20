@@ -7,7 +7,7 @@ import { PanelLeft, Search, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { EntriesSidebar } from '@/components/sidebar/EntriesSidebar';
 import { PromptsSidebar, promptCategories } from '@/components/sidebar/PromptsSidebar';
-import { MarkdownEditor } from '@/components/editor/MarkdownEditor';
+import { MarkdownEditor, type MarkdownEditorHandle } from '@/components/editor/MarkdownEditor';
 import { SearchDialog } from '@/components/SearchDialog';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { ThemeToggle } from '@/components/ThemeToggle';
@@ -41,6 +41,7 @@ export function EntriesPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [entryToDelete, setEntryToDelete] = useState<string | null>(null);
   const sidebarRef = useRef<HTMLElement | null>(null);
+  const editorRef = useRef<MarkdownEditorHandle>(null);
   const isAuthenticated = !!session?.user;
 
   // Fetch entries list
@@ -175,6 +176,10 @@ export function EntriesPage() {
       return !prev;
     });
   };
+
+  const handlePromptClick = useCallback((prompt: string) => {
+    editorRef.current?.insertPrompt(prompt);
+  }, []);
 
   // Keyboard shortcuts
   useHotkeys('mod+k', () => {
@@ -329,6 +334,7 @@ export function EntriesPage() {
                 </div>
               ) : currentEntry ? (
                 <MarkdownEditor
+                  ref={editorRef}
                   key={currentEntry.id}
                   entryId={currentEntry.id}
                   initialContent={currentEntry.content}
@@ -356,6 +362,7 @@ export function EntriesPage() {
         <PromptsSidebar
           isOpen={promptsOpen}
           onClose={() => setPromptsOpen(false)}
+          onPromptClick={handlePromptClick}
           entryId={currentEntry?.id}
           entryDraft={currentEntry?.plainText}
         />

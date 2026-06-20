@@ -1,7 +1,15 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+	forwardRef,
+	useCallback,
+	useEffect,
+	useImperativeHandle,
+	useRef,
+	useState,
+} from "react";
 import CodeMirror from "@uiw/react-codemirror";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { languages } from "@codemirror/language-data";
+import { EditorSelection } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { countWords, markdownToPlainText } from "@/lib/entry-utils";
 import { isTiptapJson, tiptapToMarkdown } from "@/lib/tiptap-to-markdown";
@@ -12,6 +20,20 @@ interface MarkdownEditorProps {
 	initialContent: string;
 	entryId: string;
 	onUpdate: (content: string, plainText: string) => void;
+}
+
+export interface MarkdownEditorHandle {
+	insertPrompt: (prompt: string) => void;
+}
+
+export function formatPromptBlock(
+	prompt: string,
+	atLineStart: boolean,
+	docEmpty: boolean,
+): string {
+	const quoted = `> ${prompt}\n> `;
+	if (docEmpty) return quoted;
+	return atLineStart ? quoted : `\n\n${quoted}`;
 }
 
 function normalizeContent(content: string): string {
@@ -53,14 +75,14 @@ const editorTheme = EditorView.theme({
 	},
 });
 
-export function MarkdownEditor({
-	initialContent,
-	entryId,
-	onUpdate,
-}: MarkdownEditorProps) {
+export const MarkdownEditor = forwardRef<
+	MarkdownEditorHandle,
+	MarkdownEditorProps
+>(function MarkdownEditor({ initialContent, entryId, onUpdate }, ref) {
 	const editorVersionRef = useRef(0);
 	const propVersionRef = useRef(0);
 	const contentRef = useRef("");
+	const viewRef = useRef<EditorView | null>(null);
 	const isTitleGeneratedRef = useRef(false);
 	const [content, setContent] = useState(() =>
 		normalizeContent(initialContent),
@@ -98,6 +120,31 @@ export function MarkdownEditor({
 		[onUpdate],
 	);
 
+	useImperativeHandle(
+		ref,
+		() => ({
+			insertPrompt(prompt: string) {
+				const view = viewRef.current;
+				if (!view) return;
+
+				const doc = view.state.doc.toString();
+				const { from, to } = view.state.selection.main;
+				const docEmpty = !doc.trim();
+				const atLineStart = from === 0 || doc[from - 1] === "\n";
+				const block = formatPromptBlock(prompt, atLineStart, docEmpty);
+				const cursorPos = from + block.length;
+
+				view.dispatch({
+					changes: { from, to, insert: block },
+					selection: EditorSelection.cursor(cursorPos),
+					scrollIntoView: true,
+				});
+				view.focus();
+			},
+		}),
+		[handleChange],
+	);
+
 	const plainText = markdownToPlainText(content);
 	const numWords = countWords(plainText);
 
@@ -114,6 +161,9 @@ export function MarkdownEditor({
 				value={content}
 				height="auto"
 				minHeight="500px"
+				onCreateEditor={(view) => {
+					viewRef.current = view;
+				}}
 				extensions={[
 					markdown({ base: markdownLanguage, codeLanguages: languages }),
 					livePreview(),
@@ -133,4 +183,4 @@ export function MarkdownEditor({
 			/>
 		</div>
 	);
-}
+});
