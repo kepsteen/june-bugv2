@@ -13,6 +13,29 @@ interface Category {
   gradient: string;
 }
 
+export const DEMO_PROMPTS: Record<string, string[]> = {
+  'working-on': [
+    "What did you make progress on today, and what's the next step?",
+    'What problem are you trying to solve right now?',
+    "What would 'done' look like for this?",
+  ],
+  'celebrate-win': [
+    "What's one thing that went well today, however small?",
+    'What did you accomplish that your past self would be proud of?',
+    'Who or what helped you get this win?',
+  ],
+  'track-bug': [
+    "What's blocking you, and what have you tried?",
+    'What did you expect vs. what happened?',
+    "What's your next hypothesis for a fix?",
+  ],
+  'capture-lesson': [
+    'What did you learn today that you want to remember?',
+    'What would you do differently next time?',
+    'What surprised you about how something worked?',
+  ],
+};
+
 export const promptCategories: Category[] = [
   {
     id: 'working-on',
@@ -54,6 +77,7 @@ interface PromptsSidebarProps {
   onPromptClick?: (prompt: string) => void;
   entryId?: string;
   entryDraft?: string;
+  demo?: boolean;
 }
 
 export function PromptsSidebar({
@@ -62,6 +86,7 @@ export function PromptsSidebar({
   onPromptClick,
   entryId,
   entryDraft,
+  demo = false,
 }: PromptsSidebarProps) {
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const regenerateMutation = useRegeneratePersonalizedPromptsMutation();
@@ -72,11 +97,14 @@ export function PromptsSidebar({
       entryDraft: entryDraft ?? undefined,
     },
     {
-      enabled: isOpen && !!selectedCategory && !!entryId,
+      enabled: !demo && isOpen && !!selectedCategory && !!entryId,
     },
   );
 
-  const prompts = data?.data.prompts ?? [];
+  const demoPrompts = demo && selectedCategory
+    ? (DEMO_PROMPTS[selectedCategory.id] ?? []).map((prompt) => ({ prompt, rationale: undefined as string | undefined }))
+    : [];
+  const prompts = demo ? demoPrompts : (data?.data.prompts ?? []);
 
   return (
     <aside
@@ -135,22 +163,24 @@ export function PromptsSidebar({
                 return <Icon className="h-5 w-5" />;
               })()}
               <h2 className="text-sm font-semibold">{selectedCategory.title}</h2>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="ml-auto h-7 w-7"
-                disabled={!entryId || regenerateMutation.isPending}
-                onClick={() => {
-                  if (!entryId) return;
-                  regenerateMutation.mutate({
-                    entryId,
-                    focusCategory: selectedCategory.focusCategory,
-                    entryDraft: entryDraft ?? undefined,
-                  });
-                }}
-              >
-                <RefreshCw className={`h-4 w-4 ${regenerateMutation.isPending ? 'animate-spin' : ''}`} />
-              </Button>
+              {!demo && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="ml-auto h-7 w-7"
+                  disabled={!entryId || regenerateMutation.isPending}
+                  onClick={() => {
+                    if (!entryId) return;
+                    regenerateMutation.mutate({
+                      entryId,
+                      focusCategory: selectedCategory.focusCategory,
+                      entryDraft: entryDraft ?? undefined,
+                    });
+                  }}
+                >
+                  <RefreshCw className={`h-4 w-4 ${regenerateMutation.isPending ? 'animate-spin' : ''}`} />
+                </Button>
+              )}
             </div>
 
             <h3 className="text-xs font-semibold text-muted-foreground mb-3 uppercase tracking-wide">
@@ -158,14 +188,14 @@ export function PromptsSidebar({
             </h3>
 
             <div className="space-y-2 overflow-y-auto">
-              {isLoading || isRefetching || regenerateMutation.isPending ? (
+              {!demo && (isLoading || isRefetching || regenerateMutation.isPending) ? (
                 <div className="text-sm text-muted-foreground border border-border rounded-md p-3 flex items-center gap-2">
                   <Loader2 className="h-4 w-4 animate-spin" />
                   Loading personalized prompts...
                 </div>
               ) : null}
 
-              {isError && !isLoading ? (
+              {!demo && isError && !isLoading ? (
                 <div className="space-y-2">
                   <div className="text-sm text-muted-foreground border border-border rounded-md p-3">
                     We couldn't load prompts right now.
@@ -179,11 +209,13 @@ export function PromptsSidebar({
 
               {!isLoading && !isError && prompts.length === 0 ? (
                 <div className="text-sm text-muted-foreground border border-border rounded-md p-3">
-                  No prompts yet for this category. Add more entry context and try again.
+                  {demo
+                    ? 'No prompts available for this category.'
+                    : 'No prompts yet for this category. Add more entry context and try again.'}
                 </div>
               ) : null}
 
-              {!isLoading && !isError
+              {(!isLoading || demo) && !isError
                 ? prompts.map((item, i) => (
                     <button
                       key={`${item.prompt}-${i}`}

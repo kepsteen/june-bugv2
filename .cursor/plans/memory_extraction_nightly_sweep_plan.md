@@ -4,6 +4,8 @@
 **Supersedes:** the debounce/poll-loop approach in [`memory_extraction_cost_optimization_handoff.md`](.cursor/plans/memory_extraction_cost_optimization_handoff.md)
 **Goal:** Cut AI spend on memory extraction by ~10x by collapsing 5-15 per-session LLM extractions into ~1 per entry per day.
 
+**Delivery:** Ship as a **single PR**. **Retire the legacy queue machinery in this PR** (do not leave it as dead code) — see Phase B.
+
 ---
 
 ## Decision summary
@@ -32,6 +34,7 @@ That relaxed requirement removes the need to detect "user is done" within second
 | Rule C (immaterial < 10% word delta) | Same-length rewrites would be silently skipped |
 | Frontend flush-on-leave | Only mattered for sub-minute freshness, which we don't need |
 | pg-boss / durable queue | Overkill for a nightly batch; revisit if real-time extraction is ever needed |
+| Legacy queue machinery (`publishEntryChangedJob`, `runEntryChangedJobWithRetries`, `buildMemoryProcessKey`, `MemoryEntryChangedJob`, `MEMORY_JOB_VERSION`) | **Retired in this PR.** The hash + `memory_extracted_at` columns now provide idempotency; the sweep + force path replace publish. Removing it (rather than leaving dead code) keeps the surface honest. `memory_events` audit writes are kept. |
 
 ---
 
@@ -77,6 +80,8 @@ memoryExtractedAt: timestamp('memory_extracted_at'),
 - Commit the `.sql`, its snapshot, and the updated `_journal.json` together (per `CLAUDE.md` migration rules; baseline is `0004`).
 - Optional index to make the nightly candidate query cheap: `CREATE INDEX ON entries (memory_extracted_at, updated_at)` (or a partial index on `plain_text <> ''`). Include it in the generated migration if Drizzle does not add one.
 
+> **Migration ordering:** keep the **column add** (Phase A) and the **enum value add** (`content_unchanged`, see Observability) as **two separate generated migrations**. Postgres `ALTER TYPE ... ADD VALUE` cannot run in the same transaction as other DDL, so isolating it avoids a `drizzle-kit` transaction failure on a fresh DB.
+
 ---
 
 ## Phase B — Reusable extraction + helpers
@@ -114,13 +119,20 @@ Behavior:
 
 This function is called by both the sweep (per entry) and manual refresh (with `force: true`).
 
+**Audit-key synthesis (required by the retirement).** Today every `memory_events` / `queue_job_events` row is keyed by `buildMemoryProcessKey(entryId, entryUpdatedAt)`. With the job gone, `extractMemoriesForEntry` must synthesize its own stable key for those audit writes — use `sweep:${entry.id}:${hash}` (deterministic; also naturally dedups a re-run on identical content). Generate a `jobId` with `randomUUID()` for the `queue_job_events` rows. The old `entryUpdatedAt`-based idempotency *check* (the `memory_events ->> 'idempotencyKey'` lookup) is **removed** — the content hash now guards re-extraction.
+
 ### Remove the per-save trigger
 
-In [`apps/api/src/features/entries/entries.service.ts`](apps/api/src/features/entries/entries.service.ts), remove the two `void memoriesPipelineService.publishEntryChangedJob({...})` calls (in `createOrGetByDate` insert branch and in `update`). Saves no longer trigger extraction.
+In [`apps/api/src/features/entries/entries.service.ts`](apps/api/src/features/entries/entries.service.ts), remove the two `void memoriesPipelineService.publishEntryChangedJob({...})` calls (in `createOrGetByDate` insert branch and in `update`) and drop the now-unused `memoriesPipelineService` import. Saves no longer trigger extraction.
 
-- `publishEntryChangedJob`, `runEntryChangedJobWithRetries`, and the `memory-queue.ts` job/idempotency-key machinery become unused for the normal path. Keep or retire them:
-  - **Recommended:** retire `publishEntryChangedJob` / `runEntryChangedJobWithRetries` / `buildMemoryProcessKey` and the `MemoryEntryChangedJob` type, since the hash + `memory_extracted_at` columns now provide idempotency. Keep `memory_events` audit writes.
-  - Lower-churn alternative: leave them in place, unused, and remove later.
+### Retire the legacy queue machinery (this PR)
+
+The hash + `memory_extracted_at` columns now provide idempotency, so the job/publish/retry layer is dead. Remove it in this PR rather than leaving dead code:
+
+- Delete [`apps/api/src/lib/queue/memory-queue.ts`](apps/api/src/lib/queue/memory-queue.ts) (`MEMORY_JOB_VERSION`, `MemoryEntryChangedJob`, `buildMemoryProcessKey`) — and the `lib/queue/` dir if nothing else lives there.
+- In `memory-pipeline.service.ts`: remove `publishEntryChangedJob`, `runEntryChangedJobWithRetries`, the `processEntryChangedJob` job-payload wrapper, and the `MemoryJobValidationError` payload-validation path. The valuable inner logic (load memories -> extract -> merge -> embed -> persist -> `memory_events`) moves into `extractMemoriesForEntry`.
+- Keep the retry-with-backoff behavior by wrapping the per-entry call (the sweep and manual refresh can both reuse a small `runWithRetries(fn)` helper, or the sweep can simply count+continue and rely on the next nightly run). Keep `memory_events` audit writes and `observabilityService.recordQueueJobEvent`/`recordAiUsage`.
+- Update/delete any imports of the removed symbols (`memories.service.ts`, `entries.service.ts`, tests). After this, the only public export of the pipeline module is `extractMemoriesForEntry` (used by the sweep service and `memories.service.ts`).
 
 ---
 
@@ -149,18 +161,19 @@ export const memorySweepService = {
           ),
         ),
       )
-      .orderBy(asc(entries.memoryExtractedAt))
+      .orderBy(sql`${entries.memoryExtractedAt} asc nulls first`)
       .limit(limit);
 
-    // process sequentially (or small concurrency, e.g. p-limit 3) to be gentle on the AI gateway
+    // process SEQUENTIALLY (await each extractMemoriesForEntry in turn) to be gentle on the AI gateway
     // tally outcomes, swallow per-entry errors (log + count), continue
   },
 };
 ```
 
 Notes:
-- `ne`/`or`/`isNull`/`gt`/`asc` from `drizzle-orm`.
-- Per-entry errors must not abort the whole sweep — catch, count, continue.
+- `ne`/`or`/`isNull`/`gt` from `drizzle-orm`; use a raw `sql` fragment for `asc nulls first` ordering so **never-extracted entries (NULL) are processed first**, not last (Postgres sorts NULLs last under a plain `asc`).
+- **Sequential processing only** for v1 (no `p-limit` dependency). A nightly batch has no latency pressure; sequential is simplest and safest for the gateway. Revisit concurrency only if batch runtime becomes a problem.
+- Per-entry errors must not abort the whole sweep — catch, count into `errors`, continue.
 - Keep `run()` infra-agnostic (no Express, no req/res) so it is callable from a script, a test, or (later) anything else.
 
 ### Sweep script
@@ -198,7 +211,9 @@ main()
 
 ### Manual refresh -> force
 
-In [`apps/api/src/features/memories/memories.service.ts`](apps/api/src/features/memories/memories.service.ts), change `enqueueRefresh` to call `extractMemoriesForEntry(latestEntry, { force: true, source: 'manual' })` directly (fire-and-forget with the existing retry wrapper, or awaited within the 202 handler's async work). It must bypass the hash skip.
+In [`apps/api/src/features/memories/memories.service.ts`](apps/api/src/features/memories/memories.service.ts), change `enqueueRefresh` to call `extractMemoriesForEntry(latestEntry, { force: true, source: 'manual' })` instead of `publishEntryChangedJob`. It must bypass the hash skip (`force: true`).
+
+- Keep the current **fire-and-forget** shape so the route still returns its accepted/202-style response immediately rather than blocking on the LLM call: `void extractMemoriesForEntry(latestEntry, { force: true, source: 'manual' }).catch((e) => console.error(...))` (optionally wrapped by the shared `runWithRetries` helper). The returned `{ accepted: true, ... }` payload is unchanged.
 
 ---
 
@@ -237,8 +252,8 @@ Because the script connects directly to the DB and does idempotent, hash-guarded
 
 ## Observability
 
-- Reuse `observabilityService.recordQueueJobEvent` / `recordAiUsage`.
-- Extend `queueJobOutcomeEnum` in [`apps/api/src/features/observability/observability.table.ts`](apps/api/src/features/observability/observability.table.ts) with `content_unchanged` (and consider a `swept` status or reuse `completed`/`skipped`). This needs its own enum-altering migration.
+- Reuse `observabilityService.recordQueueJobEvent` / `recordAiUsage`. Keep `jobType: 'memory_entry_changed'` (the `queueJobTypeEnum` value is unchanged; no need to add a sweep-specific type).
+- Extend `queueJobOutcomeEnum` in [`apps/api/src/features/observability/observability.table.ts`](apps/api/src/features/observability/observability.table.ts) with `content_unchanged`; reuse the existing `skipped` status for it (no new status value needed). This is its **own** enum-altering migration, generated separately from the Phase A column migration (see the Phase A ordering note).
 - The script logs a summary (`{ scanned, extracted, skipped, errors }`) so cron run logs are inspectable.
 - Verify in the `/internal` dashboard that nightly runs produce one `memory_extraction` `ai_usage_events` row per genuinely-changed entry and `content_unchanged` skips otherwise.
 
@@ -254,6 +269,7 @@ Because the script connects directly to the DB and does idempotent, hash-guarded
   - empty `plainText` -> `no_entry_text`.
 - **`memorySweepService.run` (mock db):** selects only changed/never-extracted entries; one extraction per changed entry; per-entry error does not abort the batch; respects `limit`.
 - **Script:** `main()` runs `memorySweepService.run()` and logs the summary; success exits 0, failure exits non-zero. (Keep heavy logic in the service so it is unit-testable without spawning the script.)
+- **Retirement cleanup:** delete/relocate any tests that import the removed queue symbols (`memory-queue.ts`, `publishEntryChangedJob`, `buildMemoryProcessKey`, `MemoryEntryChangedJob`). The existing `memory-pipeline.service.test.ts` only exercises helpers, so it survives unchanged; no current test asserts `publishEntryChangedJob` is called.
 - Run `pnpm test` and `pnpm type-check`.
 
 ---
@@ -287,6 +303,6 @@ Because the script connects directly to the DB and does idempotent, hash-guarded
 | Memories stale up to ~24h | Accepted (freshness requirement is "hours"); manual refresh available for force |
 | No exposed endpoint to attack | Sweep runs as a script inside the deploy environment; no public surface, no secret to leak |
 | Script left running / overlapping runs | `process.exit` on completion; nightly cadence makes overlap unlikely; runs are idempotent (hash-guarded) so an overlap is harmless |
-| Removing per-save publish breaks existing tests | Update/remove tests that assert `publishEntryChangedJob` is called |
+| Retiring queue machinery breaks imports/tests | No current test asserts `publishEntryChangedJob`; fix any broken imports of removed symbols during the refactor and rely on `pnpm type-check` to surface stragglers |
 | Future need for real-time extraction | `extractMemoriesForEntry(force)` is the foothold; add an on-demand trigger then |
 ```

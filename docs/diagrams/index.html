@@ -14,6 +14,7 @@
       <a href="auth-identity.html">Auth</a>
       <a href="entries.html">Entries</a>
       <a href="memory.html">Memory</a>
+      <a href="memory-cost-optimization.html">Memory Cost</a>
       <a href="ai-prompts.html">AI &amp; Prompts</a>
       <a href="frontend.html">Frontend</a>
       <a href="infrastructure.html">Infrastructure</a>
@@ -133,6 +134,11 @@
         <h3>Memory System</h3>
         <p>Vector-backed long-term memories, inline extraction pipeline, semantic retrieval.</p>
       </a>
+      <a href="memory-cost-optimization.html" class="system-card" style="text-decoration:none;color:inherit">
+        <span class="tag">Backend</span><span class="tag">Proposed</span>
+        <h3>Memory Extraction — Cost Optimization</h3>
+        <p>Nightly batch sweep instead of per-save extraction. Content-hash dedup, cron-triggered script, no queue.</p>
+      </a>
       <a href="ai-prompts.html" class="system-card" style="text-decoration:none;color:inherit">
         <span class="tag">Backend</span><span class="tag">AI</span>
         <h3>AI &amp; Personalized Prompts</h3>
@@ -147,6 +153,26 @@
         <span class="tag">Infra</span>
         <h3>Infrastructure</h3>
         <p>Database migrations, middleware stack, observability, email, uploads stub, monorepo tooling.</p>
+      </a>
+    </div>
+
+    <h2 class="page-title" style="margin-top:2.5rem;font-size:1.25rem;">Written documentation</h2>
+    <p class="page-subtitle">Cost and pricing analyses (Markdown, repo root <code>docs/</code>).</p>
+    <div class="system-grid">
+      <a href="../ai-cost-analysis.md" class="system-card" style="text-decoration:none;color:inherit">
+        <span class="tag">Economics</span>
+        <h3>AI Cost Analysis — Overview</h3>
+        <p>Index comparing baseline GPT-4o-mini vs Haiku 4.5 hybrid model split.</p>
+      </a>
+      <a href="../ai-cost-analysis-gpt-4o-mini-baseline.md" class="system-card" style="text-decoration:none;color:inherit">
+        <span class="tag">Economics</span>
+        <h3>Baseline: All GPT-4o-mini</h3>
+        <p>Current stack — per-operation costs, personas, freemium margins, optimization levers.</p>
+      </a>
+      <a href="../ai-cost-analysis-haiku-hybrid.md" class="system-card" style="text-decoration:none;color:inherit">
+        <span class="tag">Economics</span>
+        <h3>Hybrid: Haiku 4.5 + 4o-mini Titles</h3>
+        <p>Proposed split — quality tradeoff, ~7× token cost on heavy ops, tier gating guidance.</p>
       </a>
     </div>
   </main>

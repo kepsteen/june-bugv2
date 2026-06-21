@@ -50,6 +50,7 @@ export default function App() {
         <Route path="/sign-up" element={<AuthRoute><SignUpPage /></AuthRoute>} />
         <Route path="/reset-password" element={<AuthRoute><ResetPasswordPage /></AuthRoute>} />
         <Route path="/entries" element={<EntriesPage />} />
+        <Route path="/entries/demo" element={<EntriesPage demo />} />
         <Route path="/entries/:entryId" element={<EntriesPage />} />
         <Route
           path="/onboarding"

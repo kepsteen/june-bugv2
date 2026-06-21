@@ -92,6 +92,22 @@ const memoriesServiceRaw = {
       .where(and(eq(userMemories.id, id), eq(userMemories.userId, userId)));
   },
 
+  async deleteMany({
+    userId,
+    category,
+    status,
+  }: {
+    userId: string;
+    category?: MemoryCategoryEnum;
+    status?: MemoryStatusEnum;
+  }): Promise<void> {
+    const whereConditions = [eq(userMemories.userId, userId)];
+    if (category) whereConditions.push(eq(userMemories.category, category));
+    if (status) whereConditions.push(eq(userMemories.status, status));
+
+    await db.delete(userMemories).where(and(...whereConditions));
+  },
+
   async generatePersonalizedPrompts({
     userId,
     focusCategory,

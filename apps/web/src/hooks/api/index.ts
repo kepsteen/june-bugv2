@@ -47,6 +47,7 @@ export {
 export {
   useGetMemoriesQuery,
   useDeleteMemoryMutation,
+  useDeleteMemoriesMutation,
 } from './useMemories';
 
 // Prompts hooks

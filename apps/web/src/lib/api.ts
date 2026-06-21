@@ -133,6 +133,13 @@ export const memoriesApi = {
     return request<{ data: UserMemory[] }>(`/api/memories${query ? `?${query}` : ''}`);
   },
   delete: (id: string) => request<void>(`/api/memories/${id}`, { method: 'DELETE' }),
+  deleteMany: (params?: { category?: MemoryCategory; status?: MemoryStatus }) => {
+    const searchParams = new URLSearchParams();
+    if (params?.category) searchParams.set('category', params.category);
+    if (params?.status) searchParams.set('status', params.status);
+    const query = searchParams.toString();
+    return request<void>(`/api/memories${query ? `?${query}` : ''}`, { method: 'DELETE' });
+  },
 };
 
 // Prompts

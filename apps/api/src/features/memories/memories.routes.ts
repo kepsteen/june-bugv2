@@ -67,6 +67,25 @@ router.post(
 );
 
 router.delete(
+  '/',
+  AuthMiddleware(),
+  validateQuery(listMemoriesQuerySchema),
+  asyncHandler(async (req: Request, res: Response) => {
+    const appUser = await getAppUser(res);
+    const category = typeof req.query.category === 'string' ? req.query.category : undefined;
+    const status = typeof req.query.status === 'string' ? req.query.status : undefined;
+
+    await memoriesService.deleteMany({
+      userId: appUser.id,
+      category: category as (typeof memoryCategoryEnum.enumValues)[number] | undefined,
+      status: status as (typeof memoryStatusEnum.enumValues)[number] | undefined,
+    });
+
+    res.status(204).send();
+  }),
+);
+
+router.delete(
   '/:id',
   AuthMiddleware(),
   validateParams(memoryParamsSchema),

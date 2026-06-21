@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { useNavigate, useParams } from 'react-router';
+import { Link, useNavigate, useParams } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { useDebounce } from 'use-debounce';
 import { useHotkeys } from 'react-hotkeys-hook';
@@ -21,11 +21,16 @@ import {
 import { useGetCurrentAppUserQuery } from '@/hooks/api';
 import { promptsApi } from '@/lib/api';
 import { useSession } from '@/lib/auth-client';
+import { useDemoEntry } from '@/hooks/useDemoEntry';
 import { formatEntryDate, formatSavedTime } from '@/lib/entry-utils';
 
 const SIDEBAR_WIDTH = 280;
 
-export function EntriesPage() {
+interface EntriesPageProps {
+  demo?: boolean;
+}
+
+export function EntriesPage({ demo = false }: EntriesPageProps) {
   const { entryId } = useParams<{ entryId?: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -43,18 +48,19 @@ export function EntriesPage() {
   const sidebarRef = useRef<HTMLElement | null>(null);
   const editorRef = useRef<MarkdownEditorHandle>(null);
   const isAuthenticated = !!session?.user;
+  const { demoEntry, create: createDemoEntry, update: updateDemoEntry, remove: removeDemoEntry } = useDemoEntry();
 
   // Fetch entries list
   const { data: entriesData } = useGetAllEntriesQuery({
     enabled: isAuthenticated,
   });
-  const entries = entriesData?.data ?? [];
+  const entries = demo ? (demoEntry ? [demoEntry] : []) : (entriesData?.data ?? []);
 
   // Fetch current entry
   const { data: entryData, isLoading: entryLoading } = useGetEntryByIdQuery(entryId, {
     enabled: isAuthenticated,
   });
-  const currentEntry = entryData?.data ?? null;
+  const currentEntry = demo ? demoEntry : (entryData?.data ?? null);
 
   // Fetch app user
   const { data: appUserData } = useGetCurrentAppUserQuery({
@@ -118,11 +124,16 @@ export function EntriesPage() {
   }, [debouncedPending, entryId]);
 
   const handleEditorUpdate = useCallback((content: string, plainText: string) => {
+    if (demo) {
+      updateDemoEntry(content, plainText);
+      setSavedTime(formatSavedTime(new Date().toISOString()));
+      return;
+    }
     const currentId = currentEntryIdRef.current;
     setIsSaving(true);
     // Store the entryId with the content so we can verify it later
     setPendingContent({ content, plainText, entryId: currentId });
-  }, []);
+  }, [demo, updateDemoEntry]);
 
   // Create new entry with navigation on success
   const createEntryMutation = useCreateEntryMutation({
@@ -135,6 +146,14 @@ export function EntriesPage() {
   });
 
   const handleNewEntry = () => {
+    if (demo) {
+      createDemoEntry();
+      return;
+    }
+    if (!isAuthenticated) {
+      navigate('/entries/demo');
+      return;
+    }
     createEntryMutation.mutate({});
   };
 
@@ -162,6 +181,11 @@ export function EntriesPage() {
 
   const handleConfirmDelete = () => {
     if (entryToDelete) {
+      if (demo) {
+        removeDemoEntry();
+        setEntryToDelete(null);
+        return;
+      }
       deleteEntryMutation.mutate(entryToDelete);
       setEntryToDelete(null);
     }
@@ -201,7 +225,7 @@ export function EntriesPage() {
       {/* Left Sidebar */}
       <EntriesSidebar
         entries={entries}
-        selectedEntryId={entryId}
+        selectedEntryId={demo ? demoEntry?.id : entryId}
         onSelectEntry={handleSelectEntry}
         onNewEntry={handleNewEntry}
         onDeleteEntry={handleDeleteEntry}
@@ -323,12 +347,15 @@ export function EntriesPage() {
                 </div>
               )}
 
-              {!isAuthenticated ? (
+              {!isAuthenticated && !demo ? (
                 <div className="flex h-full flex-col items-center justify-center text-center">
                   <h2 className="mb-2 text-xl font-semibold">Welcome to JuneBug</h2>
                   <p className="mb-4 text-muted-foreground">Sign in to start journaling</p>
+                  <Button variant="outline" asChild>
+                    <Link to="/entries/demo">Try the demo</Link>
+                  </Button>
                 </div>
-              ) : entryLoading ? (
+              ) : entryLoading && !demo ? (
                 <div className="flex h-full items-center justify-center">
                   <div className="text-sm text-muted-foreground">Loading entry...</div>
                 </div>
@@ -339,6 +366,7 @@ export function EntriesPage() {
                   entryId={currentEntry.id}
                   initialContent={currentEntry.content}
                   onUpdate={handleEditorUpdate}
+                  disableAiTitle={demo}
                 />
               ) : entries.length === 0 ? (
                 <div className="flex h-full flex-col items-center justify-center text-center">
@@ -365,11 +393,12 @@ export function EntriesPage() {
           onPromptClick={handlePromptClick}
           entryId={currentEntry?.id}
           entryDraft={currentEntry?.plainText}
+          demo={demo}
         />
       </main>
 
       {/* Floating June Bug button */}
-      {isAuthenticated && (
+      {(isAuthenticated || demo) && (
         <button
           onClick={handlePromptsToggle}
           className={`p-2 bg-sidebar fixed bottom-6 right-6 z-50 w-18 h-18 rounded-full border-2 border-border shadow-lg overflow-hidden hover:scale-105 transition-transform ${wiggle ? 'animate-happy-wiggle' : ''}`}

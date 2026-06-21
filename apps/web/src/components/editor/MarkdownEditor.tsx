@@ -20,6 +20,7 @@ interface MarkdownEditorProps {
 	initialContent: string;
 	entryId: string;
 	onUpdate: (content: string, plainText: string) => void;
+	disableAiTitle?: boolean;
 }
 
 export interface MarkdownEditorHandle {
@@ -78,7 +79,7 @@ const editorTheme = EditorView.theme({
 export const MarkdownEditor = forwardRef<
 	MarkdownEditorHandle,
 	MarkdownEditorProps
->(function MarkdownEditor({ initialContent, entryId, onUpdate }, ref) {
+>(function MarkdownEditor({ initialContent, entryId, onUpdate, disableAiTitle }, ref) {
 	const editorVersionRef = useRef(0);
 	const propVersionRef = useRef(0);
 	const contentRef = useRef("");
@@ -149,11 +150,12 @@ export const MarkdownEditor = forwardRef<
 	const numWords = countWords(plainText);
 
 	useEffect(() => {
+		if (disableAiTitle) return;
 		if (numWords > 50 && !isTitleGeneratedRef.current) {
 			isTitleGeneratedRef.current = true;
 			createEntryTitle.mutate({ id: entryId, payload: { content: plainText } });
 		}
-	}, [numWords, entryId, createEntryTitle, plainText]);
+	}, [disableAiTitle, numWords, entryId, createEntryTitle, plainText]);
 
 	return (
 		<div className="markdown-editor overflow-hidden">

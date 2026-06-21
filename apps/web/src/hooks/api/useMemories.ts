@@ -48,4 +48,22 @@ export function useDeleteMemoryMutation(
   });
 }
 
+export function useDeleteMemoriesMutation(
+  options?: Omit<UseMutationOptions<void, Error, GetMemoriesFilters | undefined, unknown>, 'mutationFn'>,
+) {
+  const queryClient = useQueryClient();
+  const { onSuccess, ...restOptions } = options || {};
+
+  return useMutation({
+    ...restOptions,
+    mutationFn: (filters?: GetMemoriesFilters) => memoriesApi.deleteMany(filters),
+    onSuccess: (...args) => {
+      queryClient.invalidateQueries({ queryKey: ['memories'] });
+      if (onSuccess) {
+        onSuccess(...args);
+      }
+    },
+  });
+}
+
 export type { GetMemoriesFilters, GetMemoriesResponse };
