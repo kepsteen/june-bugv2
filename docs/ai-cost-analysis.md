@@ -1,6 +1,6 @@
 # JuneBug v2 — AI Cost & Pricing Analysis
 
-Bottom-up cost estimates for operating JuneBug’s AI features, derived from a codebase audit (`apps/api/src/lib/ai/ai.service.ts`, memory pipeline, prompts) and vendor list prices as of **June 2026**.
+Bottom-up cost estimates for operating JuneBug’s AI features, derived from a codebase audit (`apps/api/src/lib/ai/ai.gateway.ts` + feature-owned AI logic in entries/memories/prompts, memory pipeline) and vendor list prices as of **June 2026**.
 
 ## Documents
 

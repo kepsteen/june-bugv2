@@ -1,27 +1,15 @@
-import { createHash } from 'node:crypto';
+import type { MemoryCategory } from '@starter/shared';
 
 export type RetrievalMemory = {
-  category: 'goal' | 'project' | 'milestone' | 'blocker' | 'win' | 'learning' | 'skill_growth' | 'preference' | 'habit' | 'relationship' | 'value' | 'other';
+  category: MemoryCategory;
   importance: number;
   confidence: number;
   lastSeenAt: Date;
   milestoneState: 'planned' | 'in_progress' | 'completed' | 'blocked' | null;
 };
 
-export type MemoryCategory = RetrievalMemory['category'];
-
 function clamp(value: number, min = 0, max = 1) {
   return Math.max(min, Math.min(max, value));
-}
-
-export function fallbackDeterministicEmbedding(input: string): number[] {
-  const hash = createHash('sha256').update(input).digest();
-  const vector = new Array<number>(1536);
-  for (let i = 0; i < 1536; i += 1) {
-    const byte = hash[(i * 7) % hash.length];
-    vector[i] = (byte / 255) * 2 - 1;
-  }
-  return vector;
 }
 
 export function cosineSimilarity(a: number[], b: number[]): number {

@@ -11,8 +11,8 @@ import { appUsersService } from '../app-users/app-users.service.js';
 import {
   memoryCategoryEnum,
   memoryStatusEnum,
-} from './memories.table.js';
-import { memoriesService } from './memories.service.js';
+} from './table.js';
+import { memoriesService } from './services/service.js';
 
 const router: RouterType = Router();
 

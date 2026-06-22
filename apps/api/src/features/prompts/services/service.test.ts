@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { buildInsertValues, mapRowsToStoredPromptsResult } from './prompts.helpers.js';
-import type { EntryPrompt } from './prompts.table.js';
+import { buildInsertValues, mapRowsToStoredPromptsResult } from '../helpers/prompts.helpers.js';
+import type { EntryPrompt } from '../table.js';
 
 describe('prompts service persistence helpers', () => {
   it('maps stored prompt rows back into API result shape', () => {

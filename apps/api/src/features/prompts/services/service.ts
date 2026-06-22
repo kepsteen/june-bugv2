@@ -3,14 +3,14 @@ import { db } from '@/lib/db/index.js';
 import { wrapService } from '@/lib/service-wrapper.js';
 import { NotFoundError } from '@/lib/errors/index.js';
 import { entries } from '@/features/entries/entries.table.js';
-import { memoriesService } from '@/features/memories/memories.service.js';
-import { entryPrompts } from './prompts.table.js';
-import type { MemoryCategory } from '@/lib/ai/ai.service.js';
+import { memoriesService } from '@/features/memories/index.js';
+import { entryPrompts } from '../table.js';
+import type { MemoryCategory } from '@starter/shared';
 import {
   buildInsertValues,
   mapRowsToStoredPromptsResult,
   type StoredPersonalizedPromptsResult,
-} from './prompts.helpers.js';
+} from '../helpers/prompts.helpers.js';
 
 function buildFocusCategoryCondition(focusCategory?: MemoryCategory) {
   return focusCategory

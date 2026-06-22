@@ -1,3 +1,3 @@
-export { memoriesService } from './memories.service.js';
-export { memoriesPipelineService } from './memory-pipeline.service.js';
-export { default as memoriesRoutes } from './memories.routes.js';
+export { memoriesService } from './services/service.js';
+export { memoriesPipelineService } from './services/pipeline.service.js';
+export { default as memoriesRoutes } from './routes.js';

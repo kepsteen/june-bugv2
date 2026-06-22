@@ -14,13 +14,13 @@ import {
   userMemories,
   type UserMemory,
   type NewUserMemory,
-} from './memories.table.js';
-import { upsertMemoryEmbedding } from './memory-embedding.helpers.js';
+} from '../table.js';
+import { upsertMemoryEmbedding } from '../helpers/embedding.helpers.js';
 import {
   buildCanonicalKey,
+  extractMemoriesFromEntry,
   normalizeForKey,
-} from './memory-pipeline.helpers.js';
-import { aiService } from '@/lib/ai/ai.service.js';
+} from '../helpers/pipeline.helpers.js';
 
 export class MemoryJobValidationError extends Error {}
 
@@ -227,7 +227,7 @@ async function processEntryChangedJob({
     .orderBy(desc(userMemories.lastSeenAt))
     .limit(150);
 
-  const extracted = await aiService.extractMemoriesFromEntry({
+  const extracted = await extractMemoriesFromEntry({
     entryText: plainText,
     existingMemories: existingMemories.map((m) => ({
       category: m.category,

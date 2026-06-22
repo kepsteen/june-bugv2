@@ -35,7 +35,7 @@ Gateway may add a small routing fee; figures assume pass-through.
 
 ---
 
-## AI operations (from `ai.service.ts`)
+## AI operations (from feature-owned AI + `ai.gateway.ts`)
 
 | Feature | Model | Trigger | Est. tokens (in / out) | Cost / call |
 |---------|-------|---------|------------------------|-------------|
@@ -136,7 +136,7 @@ Optimized power user on this stack: **~$0.05/mo** AI → headroom to upgrade **p
 
 | Area | Path |
 |------|------|
-| All LLM calls | `apps/api/src/lib/ai/ai.service.ts` |
+| All LLM calls | `apps/api/src/lib/ai/ai.gateway.ts` + `entries.service.ts`, `memory-pipeline.helpers.ts`, `memories.service.ts` |
 | Job publish | `apps/api/src/features/entries/entries.service.ts` |
 | Pipeline | `apps/api/src/features/memories/memory-pipeline.service.ts` |
 | Prompt cache | `apps/api/src/features/prompts/prompts.service.ts` |

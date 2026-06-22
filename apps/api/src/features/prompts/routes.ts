@@ -4,8 +4,8 @@ import { AuthMiddleware } from '@/middleware/auth-middleware.js';
 import { asyncHandler } from '@/lib/async-handler.js';
 import { validateBody } from '@/middleware/validation-middleware.js';
 import { appUsersService } from '../app-users/app-users.service.js';
-import { memoryCategoryEnum } from '../memories/memories.table.js';
-import { promptsService } from './prompts.service.js';
+import { memoryCategoryEnum } from '../memories/table.js';
+import { promptsService } from './services/service.js';
 
 const router: RouterType = Router();
 

@@ -53,7 +53,7 @@ Anthropic **Batch API** (50% off) and **prompt caching** (up to ~90% off cached 
 
 ## Per-operation cost (same token assumptions as baseline)
 
-Token estimates from `ai.service.ts` prompts (unchanged by model):
+Token estimates from feature-owned prompt strings (unchanged by model):
 
 | Feature | Model | Tokens (in / out) | Cost / call |
 |---------|-------|---------------------|-------------|
@@ -163,7 +163,7 @@ Plus @ $8 **without** optimizations on a power user: ~$2.86 AI alone → **~64% 
 
 ## Implementation notes
 
-Today all features use a single model constant in `ai.service.ts`:
+Today all features use model constants in their owning feature files (`entries.service.ts`, `memory-pipeline.helpers.ts`, `memories.service.ts`) via `ai.gateway.ts`:
 
 ```ts
 const model = 'openai/gpt-4o-mini'; // generateTitle, extractMemoriesFromEntry, generatePersonalizedPrompts

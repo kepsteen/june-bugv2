@@ -10,7 +10,7 @@ import {
 } from 'drizzle-orm/pg-core';
 import { appUsers } from '../app-users/app-users.table';
 import { entries } from '../entries/entries.table';
-import { memoryCategoryEnum } from '../memories/memories.table';
+import { memoryCategoryEnum } from '../memories/table';
 
 export const entryPrompts = pgTable(
   'entry_prompts',

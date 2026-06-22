@@ -1,5 +1,5 @@
-import type { MemoryCategory, PersonalizedPromptSuggestion } from '@/lib/ai/ai.service.js';
-import type { EntryPrompt, NewEntryPrompt } from './prompts.table.js';
+import type { MemoryCategory, PersonalizedPromptSuggestion } from '@starter/shared';
+import type { EntryPrompt, NewEntryPrompt } from '../table.js';
 
 export type PromptRetrieval = {
   structuredCount: number;

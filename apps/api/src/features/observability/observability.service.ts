@@ -3,7 +3,7 @@ import { db } from '@/lib/db/index.js';
 import { wrapService } from '@/lib/service-wrapper.js';
 import { appUsers } from '@/features/app-users/app-users.table.js';
 import { entries } from '@/features/entries/entries.table.js';
-import { memoryEvents, userMemories } from '@/features/memories/memories.table.js';
+import { memoryEvents, userMemories } from '@/features/memories/table.js';
 import { tags } from '@/features/tags/tags.table.js';
 import {
   aiUsageEvents,

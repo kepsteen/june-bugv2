@@ -1,10 +1,18 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const embedTextMock = vi.fn();
+const embedMock = vi.fn();
 
-vi.mock('@/lib/ai/ai.service.js', () => ({
-  aiService: {
-    embedText: (...args: unknown[]) => embedTextMock(...args),
+vi.mock('ai', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('ai')>();
+  return {
+    ...actual,
+    embed: (...args: unknown[]) => embedMock(...args),
+  };
+});
+
+vi.mock('@/features/observability/observability.service.js', () => ({
+  observabilityService: {
+    recordAiUsage: vi.fn(),
   },
 }));
 
@@ -20,19 +28,30 @@ vi.mock('@/lib/db/index.js', () => ({
 }));
 
 describe('upsertMemoryEmbedding', () => {
+  const originalGatewayKey = process.env.AI_GATEWAY_API_KEY;
+
   beforeEach(() => {
-    embedTextMock.mockReset();
+    embedMock.mockReset();
     insertMock.mockClear();
     valuesMock.mockClear();
     onConflictDoUpdateMock.mockClear();
     returningMock.mockReset();
+    process.env.AI_GATEWAY_API_KEY = 'test-key';
   });
 
-  it('stores embeddings from aiService.embedText with the returned model tag', async () => {
+  afterEach(() => {
+    if (originalGatewayKey === undefined) {
+      delete process.env.AI_GATEWAY_API_KEY;
+    } else {
+      process.env.AI_GATEWAY_API_KEY = originalGatewayKey;
+    }
+  });
+
+  it('stores embeddings from embedMemoryText with the returned model tag', async () => {
     const embedding = Array.from({ length: 1536 }, () => 0.25);
-    embedTextMock.mockResolvedValue({
+    embedMock.mockResolvedValue({
       embedding,
-      embeddingModel: 'text-embedding-3-small',
+      usage: { inputTokens: 12 },
     });
     returningMock.mockResolvedValue([
       {
@@ -43,7 +62,7 @@ describe('upsertMemoryEmbedding', () => {
       },
     ]);
 
-    const { upsertMemoryEmbedding } = await import('./memory-embedding.helpers.js');
+    const { upsertMemoryEmbedding } = await import('./embedding.helpers.js');
 
     const result = await upsertMemoryEmbedding({
       memoryId: 'memory-1',
@@ -52,11 +71,9 @@ describe('upsertMemoryEmbedding', () => {
       entryId: 'entry-1',
     });
 
-    expect(embedTextMock).toHaveBeenCalledWith({
-      text: 'Ship memory embeddings\nComplete semantic retrieval',
-      userId: 'user-1',
-      entryId: 'entry-1',
-      memoryId: 'memory-1',
+    expect(embedMock).toHaveBeenCalledWith({
+      model: 'openai/text-embedding-3-small',
+      value: 'Ship memory embeddings\nComplete semantic retrieval',
     });
     expect(valuesMock).toHaveBeenCalledWith({
       memoryId: 'memory-1',

@@ -1,16 +1,50 @@
 import { db } from '@/lib/db/index.js';
 import { entries } from './entries.table.js';
 import { eq, and, desc, gte, lte, ilike } from 'drizzle-orm';
-import { NotFoundError } from '@/lib/errors/index.js';
+import { AppError, NotFoundError } from '@/lib/errors/index.js';
 import { wrapService } from '@/lib/service-wrapper.js';
-import { aiService } from '@/lib/ai/ai.service.js';
-import { memoriesPipelineService } from '@/features/memories/memory-pipeline.service.js';
-import type { Entry, NewEntry } from './entries.table.js';
+import { aiGateway } from '@/lib/ai/ai.gateway.js';
+import { memoriesPipelineService } from '@/features/memories/index.js';
+import z from 'zod';
+import type { Entry } from './entries.table.js';
 
 function getMidnightUTC(date: Date): Date {
   const d = new Date(date);
   d.setUTCHours(0, 0, 0, 0);
   return d;
+}
+
+async function generateEntryTitle({
+  content,
+  userId,
+  entryId,
+}: {
+  content: string;
+  userId: string;
+  entryId?: string;
+}): Promise<string> {
+  if (!content?.trim()) {
+    throw new AppError('Content is required for title generation', 400);
+  }
+
+  const model = 'openai/gpt-4o-mini';
+  const { data } = await aiGateway.generateObject({
+    model,
+    prompt: `Generate a concise title (max 50 chars, do not use quotes) for this journal entry:\n\n${content}`,
+    schema: z.object({
+      title: z
+        .string()
+        .max(50)
+        .refine((val) => !val.includes('"') && !val.includes("'"), {
+          message: 'Title must not contain quotes',
+        }),
+    }),
+    userId,
+    feature: 'entry_title',
+    requestContext: entryId ? { entryId } : undefined,
+  });
+
+  return data.title;
 }
 
 const entriesServiceRaw = {
@@ -51,7 +85,7 @@ const entriesServiceRaw = {
   },
 
   async updateTitle({ id, userId, content }: { id: string; userId: string; content: string }): Promise<Entry> {
-    const generatedTitle = await aiService.generateTitle({ content, userId, entryId: id });
+    const generatedTitle = await generateEntryTitle({ content, userId, entryId: id });
 
     const [updated] = await db
       .update(entries)

@@ -2,6 +2,14 @@ const API_BASE =
   import.meta.env.VITE_API_URL ??
   (import.meta.env.DEV ? 'http://localhost:3000' : '');
 
+import type {
+  MemoryCategory,
+  MemoryStatus,
+  PersonalizedPromptSuggestion,
+} from '@starter/shared';
+
+export type { MemoryCategory, MemoryStatus, PersonalizedPromptSuggestion };
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     ...options,
@@ -269,22 +277,6 @@ export interface Todo {
   updatedAt: string;
 }
 
-export type MemoryCategory =
-  | 'goal'
-  | 'project'
-  | 'milestone'
-  | 'blocker'
-  | 'win'
-  | 'learning'
-  | 'skill_growth'
-  | 'preference'
-  | 'habit'
-  | 'relationship'
-  | 'value'
-  | 'other';
-
-export type MemoryStatus = 'active' | 'stale' | 'archived';
-
 export interface UserMemory {
   id: string;
   userId: string;
@@ -307,17 +299,6 @@ export interface UserMemory {
   createdAt: string;
   updatedAt: string;
   archivedAt?: string | null;
-}
-
-export interface PersonalizedPromptSuggestion {
-  prompt: string;
-  rationale: string;
-  anchor:
-    | {
-        category: MemoryCategory;
-        memoryTitle: string;
-      }
-    | null;
 }
 
 export interface PersonalizedPromptsResult {

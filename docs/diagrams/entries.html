@@ -64,7 +64,7 @@
         <text x="410" y="175" text-anchor="middle" font-family="Nunito,sans-serif" font-size="11" font-weight="600">entriesService</text>
         <text x="300" y="200" font-family="JetBrains Mono,monospace" font-size="9">createOrGetByDate()</text>
         <text x="300" y="218" font-family="JetBrains Mono,monospace" font-size="9">update() → publish memory job</text>
-        <text x="300" y="236" font-family="JetBrains Mono,monospace" font-size="9">updateTitle() → aiService</text>
+        <text x="300" y="236" font-family="JetBrains Mono,monospace" font-size="9">updateTitle() → aiGateway</text>
 
         <line x1="550" y1="90" x2="410" y2="150" stroke="#6b6358" marker-end="url(#arrow)"/>
 
@@ -208,7 +208,7 @@
         <text x="630" y="458" text-anchor="middle" font-family="Nunito,sans-serif" font-size="10" font-weight="600">processEntryChangedJob()</text>
         <text x="545" y="478" font-family="Nunito,sans-serif" font-size="9">① idempotency check (memory_events)</text>
         <text x="545" y="496" font-family="Nunito,sans-serif" font-size="9">② skip if empty plainText</text>
-        <text x="545" y="514" font-family="Nunito,sans-serif" font-size="9">③ aiService.extractMemoriesFromEntry</text>
+        <text x="545" y="514" font-family="Nunito,sans-serif" font-size="9">③ extractMemoriesFromEntry (memory-pipeline.helpers)</text>
         <text x="545" y="532" font-family="Nunito,sans-serif" font-size="9">④ merge / create user_memories</text>
         <text x="545" y="550" font-family="Nunito,sans-serif" font-size="9">⑤ embed + persist memory_embeddings</text>
 
@@ -233,7 +233,7 @@
         <rect x="25" y="490" width="500" height="100" rx="8" fill="white" stroke="#6b6358" stroke-dasharray="6"/>
         <text x="40" y="515" font-family="Nunito,sans-serif" font-size="11" font-weight="700">Parallel path — AI title (independent of save)</text>
         <text x="40" y="538" font-family="Nunito,sans-serif" font-size="9">When plainText exceeds 50 words, MarkdownEditor fires POST /api/entries/:id/title once per entry.</text>
-        <text x="40" y="556" font-family="Nunito,sans-serif" font-size="9">entriesService.updateTitle() → aiService.generateTitle() → UPDATE entries.Title only.</text>
+        <text x="40" y="556" font-family="Nunito,sans-serif" font-size="9">entriesService.updateTitle() → generateEntryTitle() via aiGateway → UPDATE entries.Title only.</text>
         <text x="40" y="574" font-family="Nunito,sans-serif" font-size="9" fill="#6b6358">Does not trigger the memory pipeline.</text>
 
         <!-- Create path -->

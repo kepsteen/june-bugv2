@@ -62,7 +62,7 @@ export function SignUpPage() {
     setIsGithubLoading(true);
 
     try {
-      await signIn.social({ provider: 'github', callbackURL: `${window.location.origin}/entries` });
+      await signIn.social({ provider: 'github', callbackURL: `${window.location.origin}/onboarding` });
     } catch {
       setError('GitHub sign up failed');
       setIsGithubLoading(false);

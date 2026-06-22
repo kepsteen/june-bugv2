@@ -17,7 +17,7 @@ describe('memoriesService.deleteMany', () => {
   });
 
   it('deletes all memories for a user when no filters are provided', async () => {
-    const { memoriesService } = await import('./memories.service.js');
+    const { memoriesService } = await import('./service.js');
 
     await memoriesService.deleteMany({ userId: 'user-1' });
 
@@ -26,7 +26,7 @@ describe('memoriesService.deleteMany', () => {
   });
 
   it('scopes deleteMany to the requesting user and optional filters', async () => {
-    const { memoriesService } = await import('./memories.service.js');
+    const { memoriesService } = await import('./service.js');
 
     await memoriesService.deleteMany({
       userId: 'user-1',
@@ -39,7 +39,7 @@ describe('memoriesService.deleteMany', () => {
   });
 
   it('does not accept another user id in the delete payload', async () => {
-    const { memoriesService } = await import('./memories.service.js');
+    const { memoriesService } = await import('./service.js');
 
     await memoriesService.deleteMany({ userId: 'user-2', category: 'blocker' });
 
