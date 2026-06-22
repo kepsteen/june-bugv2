@@ -1,66 +1,58 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Checkbox } from '@/components/ui/checkbox';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Label } from '@/components/ui/label';
 import { useCompleteOnboardingMutation } from '@/hooks/api';
 import { Check } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type QuestionType = 'text' | 'number' | 'radio' | 'checkbox';
+type FlowPhase = 'welcome' | 'questioning' | 'completing' | 'done';
+
+type QuestionType = 'text' | 'radio' | 'checkbox';
 
 interface Question {
   id: string;
   text: string;
+  hint?: string;
   type: QuestionType;
   options?: string[];
   placeholder?: string;
 }
 
-interface Message {
-  role: 'assistant' | 'user';
-  content: string;
-}
-
-// ─── Questions ────────────────────────────────────────────────────────────────
+const MASCOT_SRC = '/june-bug-logo.png';
 
 const QUESTIONS: Question[] = [
   {
     id: 'fullName',
-    text: "What's your full name?",
+    text: 'First things first — what should I call you?',
     type: 'text',
     placeholder: 'Jane Smith',
   },
   {
-    id: 'age',
-    text: "How old are you?",
-    type: 'number',
-    placeholder: '28',
-  },
-  {
     id: 'currentRole',
-    text: "What's your current role?",
+    text: 'What do you do?',
+    hint: 'Your title, your craft — however you would put it.',
     type: 'text',
     placeholder: 'Software Engineer',
   },
   {
     id: 'experienceLevel',
-    text: "What's your experience level?",
+    text: 'How seasoned are you in the dev world?',
     type: 'radio',
     options: ['Junior', 'Mid-Level', 'Senior', 'Lead', 'Principal'],
   },
   {
     id: 'mentorshipStyle',
-    text: "What's your mentorship/learning style?",
+    text: 'How do you like to grow and learn?',
     type: 'radio',
     options: ['Structured', 'Exploratory', 'Challenge-driven', 'Reflective'],
   },
   {
     id: 'developmentGoals',
-    text: "What are your development goals?",
+    text: 'What are you working toward right now?',
+    hint: 'Pick as many as feel right.',
     type: 'checkbox',
     options: [
       'Build better debugging skills',
@@ -75,190 +67,247 @@ const QUESTIONS: Question[] = [
   },
   {
     id: 'techStack',
-    text: "What's your tech stack?",
+    text: "What's in your toolkit?",
+    hint: 'Languages, frameworks — the stuff you reach for.',
     type: 'text',
     placeholder: 'React, TypeScript, Node.js, PostgreSQL',
   },
   {
-    id: 'workEnvironment',
-    text: "What's your work environment?",
-    type: 'radio',
-    options: [
-      'Individual contributor at company',
-      'Team lead/manager',
-      'Freelance/consultant',
-      'Student/bootcamp',
-      'Career transition/job seeking',
-      'Side projects only',
-    ],
-  },
-  {
     id: 'journalingFrequency',
-    text: "How often do you plan to journal?",
+    text: 'How often would you like to reflect?',
     type: 'radio',
     options: ['Daily', 'Every other day', 'Weekly', 'Custom schedule'],
   },
-  {
-    id: 'journalingTime',
-    text: "What time do you prefer to journal?",
-    type: 'text',
-    placeholder: '9:00 AM',
-  },
-  {
-    id: 'notificationPreferences',
-    text: "What notification preferences do you have?",
-    type: 'checkbox',
-    options: ['Push notifications', 'Email reminders', 'None'],
-  },
 ];
 
-// ─── Sidebar phases ───────────────────────────────────────────────────────────
+const AUTO_ADVANCE_MS = 600;
+const COMPLETING_MIN_DELAY_MS = 3200;
+const DONE_NAVIGATE_DELAY_MS = 1800;
 
-const PHASES = [
-  { label: 'Profile Info', questionIds: ['fullName', 'age', 'currentRole', 'experienceLevel'] },
-  { label: 'Goals & Style', questionIds: ['mentorshipStyle', 'developmentGoals'] },
-  { label: 'Tech Stack', questionIds: ['techStack', 'workEnvironment'] },
-  { label: 'Journal Schedule', questionIds: ['journalingFrequency', 'journalingTime', 'notificationPreferences'] },
-];
+// ─── Mascot ───────────────────────────────────────────────────────────────────
 
-function getPhaseIndex(questionId: string): number {
-  return PHASES.findIndex((p) => p.questionIds.includes(questionId));
-}
-
-// ─── Typing indicator ─────────────────────────────────────────────────────────
-
-function TypingIndicator() {
+function MascotFallback() {
   return (
-    <div className="flex items-end gap-2 mb-4">
-      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground text-xs font-semibold select-none">
-        JB
-      </div>
-      <div className="rounded-2xl rounded-bl-sm bg-muted px-4 py-2.5 flex items-center gap-1">
-        <span className="h-2 w-2 rounded-full bg-muted-foreground/50 animate-bounce [animation-delay:-0.3s]" />
-        <span className="h-2 w-2 rounded-full bg-muted-foreground/50 animate-bounce [animation-delay:-0.15s]" />
-        <span className="h-2 w-2 rounded-full bg-muted-foreground/50 animate-bounce" />
-      </div>
+    <div className="flex h-full w-full items-center justify-center rounded-full bg-primary/15 text-3xl select-none">
+      🪲
     </div>
   );
 }
 
-// ─── Chat message ─────────────────────────────────────────────────────────────
-
-function ChatMessage({ message }: { message: Message }) {
-  const isAssistant = message.role === 'assistant';
-
-  if (isAssistant) {
-    return (
-      <div className="flex items-end gap-2 mb-4">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground text-xs font-semibold select-none">
-          JB
-        </div>
-        <div className="max-w-[75%] rounded-2xl rounded-bl-sm bg-muted px-4 py-2.5 text-sm">
-          {message.content}
-        </div>
-      </div>
-    );
-  }
+function MascotAvatar({
+  wiggle = false,
+  size = 'lg',
+  className,
+}: {
+  wiggle?: boolean;
+  size?: 'md' | 'lg';
+  className?: string;
+}) {
+  const [imgError, setImgError] = useState(false);
+  const sizeClass = size === 'lg' ? 'h-32 w-32 p-5' : 'h-28 w-28 p-4';
 
   return (
-    <div className="flex items-end justify-end gap-2 mb-4">
-      <div className="max-w-[75%] rounded-2xl rounded-br-sm bg-primary px-4 py-2.5 text-sm text-primary-foreground">
-        {message.content}
-      </div>
+    <div
+      className={cn(
+        'relative flex shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-border/60 bg-card shadow-[0_8px_24px_-8px_oklch(0.41_0.08_78.86/0.25)]',
+        sizeClass,
+        !wiggle && 'animate-gentle-float',
+        wiggle && 'animate-happy-wiggle',
+        className,
+      )}
+      aria-hidden
+    >
+      {!imgError ? (
+        <img
+          src={MASCOT_SRC}
+          alt=""
+          className="h-full w-full object-contain"
+          onError={() => setImgError(true)}
+        />
+      ) : (
+        <MascotFallback />
+      )}
     </div>
   );
 }
 
-// ─── Answer input ─────────────────────────────────────────────────────────────
+// ─── Progress ─────────────────────────────────────────────────────────────────
+
+function ProgressBar({ progress }: { progress: number }) {
+  return (
+    <div
+      className="fixed inset-x-0 top-0 z-20 h-0.5 bg-border/40"
+      role="progressbar"
+      aria-valuenow={Math.round(progress)}
+      aria-valuemin={0}
+      aria-valuemax={100}
+    >
+      <div
+        className="h-full bg-primary transition-[width] duration-500 ease-out motion-reduce:transition-none"
+        style={{ width: `${progress}%` }}
+      />
+    </div>
+  );
+}
+
+function ProgressDots({
+  total,
+  current,
+}: {
+  total: number;
+  current: number;
+}) {
+  return (
+    <div
+      className="flex items-center justify-center gap-2 pt-8"
+      aria-label={`Question ${current + 1} of ${total}`}
+    >
+      {Array.from({ length: total }, (_, i) => (
+        <span
+          key={i}
+          className={cn(
+            'h-1.5 rounded-full transition-all duration-300 motion-reduce:transition-none',
+            i === current ? 'w-6 bg-primary' : 'w-1.5',
+            i < current ? 'bg-primary/70' : i > current ? 'bg-border' : '',
+          )}
+        />
+      ))}
+    </div>
+  );
+}
+
+// ─── Option cards ─────────────────────────────────────────────────────────────
+
+function OptionCard({
+  label,
+  selected,
+  onClick,
+  disabled,
+  mode,
+}: {
+  label: string;
+  selected: boolean;
+  onClick: () => void;
+  disabled?: boolean;
+  mode: 'radio' | 'checkbox';
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={cn(
+        'group relative w-full rounded-xl border-2 px-5 py-4 text-left text-sm font-medium transition-all duration-200 motion-reduce:transition-none',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+        'disabled:pointer-events-none disabled:opacity-50',
+        selected
+          ? 'scale-[1.02] border-primary bg-primary/10 text-foreground'
+          : 'border-border bg-card text-foreground hover:scale-[1.01] hover:border-primary/40 hover:bg-muted/40',
+      )}
+    >
+      <span className="flex items-center justify-between gap-3">
+        <span>{label}</span>
+        {selected && (
+          <span
+            className={cn(
+              'flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground',
+              mode === 'radio' ? 'rounded-full' : 'rounded-md',
+            )}
+          >
+            <Check className="h-3 w-3" strokeWidth={3} />
+          </span>
+        )}
+      </span>
+    </button>
+  );
+}
+
+// ─── Answer inputs ────────────────────────────────────────────────────────────
 
 interface AnswerInputProps {
   question: Question;
   onSubmit: (value: string | string[]) => void;
-  isLoading: boolean;
+  onWiggle: () => void;
+  disabled: boolean;
 }
 
-function AnswerInput({ question, onSubmit, isLoading }: AnswerInputProps) {
+function AnswerInput({ question, onSubmit, onWiggle, disabled }: AnswerInputProps) {
   const [textValue, setTextValue] = useState('');
-  const [radioValue, setRadioValue] = useState('');
+  const [selectedRadio, setSelectedRadio] = useState('');
   const [checkboxValues, setCheckboxValues] = useState<string[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
+  const advanceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     setTextValue('');
-    setRadioValue('');
+    setSelectedRadio('');
     setCheckboxValues([]);
-    if (question.type === 'text' || question.type === 'number') {
-      setTimeout(() => inputRef.current?.focus(), 50);
+    if (question.type === 'text') {
+      const timer = setTimeout(() => inputRef.current?.focus(), 100);
+      return () => clearTimeout(timer);
     }
   }, [question.id, question.type]);
 
-  const handleCheckboxChange = (option: string, checked: boolean) => {
+  useEffect(() => {
+    return () => {
+      if (advanceTimerRef.current) clearTimeout(advanceTimerRef.current);
+    };
+  }, []);
+
+  const handleRadioSelect = (option: string) => {
+    if (disabled) return;
+    setSelectedRadio(option);
+    onWiggle();
+    advanceTimerRef.current = setTimeout(() => {
+      onSubmit(option);
+    }, AUTO_ADVANCE_MS);
+  };
+
+  const handleCheckboxToggle = (option: string) => {
+    if (disabled) return;
     setCheckboxValues((prev) =>
-      checked ? [...prev, option] : prev.filter((v) => v !== option),
+      prev.includes(option) ? prev.filter((v) => v !== option) : [...prev, option],
     );
   };
 
-  const handleSubmit = () => {
-    if (question.type === 'text' || question.type === 'number') {
-      if (!textValue.trim()) return;
-      onSubmit(textValue.trim());
-    } else if (question.type === 'radio') {
-      if (!radioValue) return;
-      onSubmit(radioValue);
-    } else if (question.type === 'checkbox') {
-      if (checkboxValues.length === 0) return;
-      onSubmit(checkboxValues);
-    }
+  const handleTextSubmit = () => {
+    if (!textValue.trim() || disabled) return;
+    onWiggle();
+    onSubmit(textValue.trim());
+  };
+
+  const handleCheckboxSubmit = () => {
+    if (checkboxValues.length === 0 || disabled) return;
+    onWiggle();
+    onSubmit(checkboxValues);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault();
-      handleSubmit();
+      handleTextSubmit();
     }
   };
 
-  if (question.type === 'text' || question.type === 'number') {
+  if (question.type === 'text') {
     return (
-      <div className="flex gap-2">
+      <div className="mt-8 space-y-4">
         <Input
           ref={inputRef}
-          type={question.type}
+          type="text"
           placeholder={question.placeholder}
           value={textValue}
           onChange={(e) => setTextValue(e.target.value)}
           onKeyDown={handleKeyDown}
-          disabled={isLoading}
-          className="flex-1"
-          min={question.type === 'number' ? 1 : undefined}
-          max={question.type === 'number' ? 120 : undefined}
+          disabled={disabled}
+          className="h-12 border-2 bg-card text-center text-base md:text-lg"
+          aria-label={question.text}
         />
-        <Button onClick={handleSubmit} disabled={!textValue.trim() || isLoading}>
-          Send
-        </Button>
-      </div>
-    );
-  }
-
-  if (question.type === 'radio' && question.options) {
-    return (
-      <div className="space-y-3">
-        <RadioGroup value={radioValue} onValueChange={setRadioValue} className="grid grid-cols-1 gap-2">
-          {question.options.map((option) => (
-            <label
-              key={option}
-              htmlFor={`radio-${option}`}
-              className="flex items-center gap-3 rounded-lg border border-border px-4 py-2.5 cursor-pointer hover:bg-muted/50 transition-colors has-[[data-state=checked]]:border-primary has-[[data-state=checked]]:bg-primary/5"
-            >
-              <RadioGroupItem id={`radio-${option}`} value={option} />
-              <span className="text-sm">{option}</span>
-            </label>
-          ))}
-        </RadioGroup>
         <Button
-          onClick={handleSubmit}
-          disabled={!radioValue || isLoading}
-          className="w-full"
+          onClick={handleTextSubmit}
+          disabled={!textValue.trim() || disabled}
+          className="h-12 w-full text-base"
+          size="lg"
         >
           Continue
         </Button>
@@ -266,31 +315,43 @@ function AnswerInput({ question, onSubmit, isLoading }: AnswerInputProps) {
     );
   }
 
+  if (question.type === 'radio' && question.options) {
+    return (
+      <div className="mt-8 grid grid-cols-1 gap-3">
+        {question.options.map((option) => (
+          <OptionCard
+            key={option}
+            label={option}
+            selected={selectedRadio === option}
+            onClick={() => handleRadioSelect(option)}
+            disabled={disabled || Boolean(selectedRadio)}
+            mode="radio"
+          />
+        ))}
+      </div>
+    );
+  }
+
   if (question.type === 'checkbox' && question.options) {
     return (
-      <div className="space-y-3">
-        <div className="grid grid-cols-1 gap-2">
+      <div className="mt-8 space-y-4">
+        <div className="grid grid-cols-1 gap-3">
           {question.options.map((option) => (
-            <label
+            <OptionCard
               key={option}
-              htmlFor={`check-${option}`}
-              className="flex items-center gap-3 rounded-lg border border-border px-4 py-2.5 cursor-pointer hover:bg-muted/50 transition-colors"
-            >
-              <Checkbox
-                id={`check-${option}`}
-                checked={checkboxValues.includes(option)}
-                onCheckedChange={(checked) =>
-                  handleCheckboxChange(option, checked === true)
-                }
-              />
-              <span className="text-sm">{option}</span>
-            </label>
+              label={option}
+              selected={checkboxValues.includes(option)}
+              onClick={() => handleCheckboxToggle(option)}
+              disabled={disabled}
+              mode="checkbox"
+            />
           ))}
         </div>
         <Button
-          onClick={handleSubmit}
-          disabled={checkboxValues.length === 0 || isLoading}
-          className="w-full"
+          onClick={handleCheckboxSubmit}
+          disabled={checkboxValues.length === 0 || disabled}
+          className="h-12 w-full text-base"
+          size="lg"
         >
           Continue
         </Button>
@@ -301,250 +362,240 @@ function AnswerInput({ question, onSubmit, isLoading }: AnswerInputProps) {
   return null;
 }
 
+// ─── Screen shells ────────────────────────────────────────────────────────────
+
+function ScreenShell({
+  stepKey,
+  children,
+  dots,
+}: {
+  stepKey: string;
+  children: React.ReactNode;
+  dots?: { total: number; current: number };
+}) {
+  return (
+    <div
+      key={stepKey}
+      className="animate-onboarding-step-in flex min-h-[min(100dvh,100vh)] w-full flex-col items-center justify-center px-6 py-16"
+    >
+      <div className="mx-auto flex w-full max-w-[480px] flex-col items-center text-center">
+        {children}
+        {dots && <ProgressDots total={dots.total} current={dots.current} />}
+      </div>
+    </div>
+  );
+}
+
+function LoadingDots() {
+  return (
+    <div className="mt-6 flex items-center justify-center gap-1.5" aria-hidden>
+      <span className="h-2 w-2 rounded-full bg-primary animate-onboarding-dot [animation-delay:-0.3s]" />
+      <span className="h-2 w-2 rounded-full bg-primary animate-onboarding-dot [animation-delay:-0.15s]" />
+      <span className="h-2 w-2 rounded-full bg-primary animate-onboarding-dot" />
+    </div>
+  );
+}
+
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export function OnboardingPage() {
   const navigate = useNavigate();
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [phase, setPhase] = useState<FlowPhase>('welcome');
+  const [questionIndex, setQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string | string[]>>({});
-  const [isTyping, setIsTyping] = useState(true);
-  const [isComplete, setIsComplete] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  
+  const [wiggle, setWiggle] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [isAdvancing, setIsAdvancing] = useState(false);
+  const navigateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const completingStartedAtRef = useRef<number | null>(null);
+  const apiSucceededRef = useRef(false);
+
+  const goToDoneAndNavigate = useCallback(() => {
+    setPhase('done');
+    navigateTimerRef.current = setTimeout(() => {
+      navigate('/entries');
+    }, DONE_NAVIGATE_DELAY_MS);
+  }, [navigate]);
+
+  const finishCompletingWhenReady = useCallback(() => {
+    const startedAt = completingStartedAtRef.current ?? Date.now();
+    const elapsed = Date.now() - startedAt;
+    const remaining = Math.max(0, COMPLETING_MIN_DELAY_MS - elapsed);
+
+    navigateTimerRef.current = setTimeout(goToDoneAndNavigate, remaining);
+  }, [goToDoneAndNavigate]);
+
   const completeOnboardingMutation = useCompleteOnboardingMutation({
     onSuccess: () => {
-      navigate('/entries');
+      apiSucceededRef.current = true;
+      finishCompletingWhenReady();
     },
     onError: () => {
-      setIsSubmitting(false);
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: 'assistant',
-          content: "Sorry, something went wrong saving your preferences. Please try again.",
-        },
-      ]);
-      setIsComplete(false);
+      apiSucceededRef.current = false;
+      completingStartedAtRef.current = null;
+      if (navigateTimerRef.current) clearTimeout(navigateTimerRef.current);
+      setSubmitError('Something went wrong saving your preferences. Please try again.');
+      setPhase('questioning');
+      setQuestionIndex(QUESTIONS.length - 1);
+      setIsAdvancing(false);
     },
   });
 
-  const currentQuestion = QUESTIONS[currentQuestionIndex];
-  const currentPhaseIndex = currentQuestion
-    ? getPhaseIndex(currentQuestion.id)
-    : PHASES.length;
-
-  // Determine completed phases: all phases whose questions are all answered
-  const completedPhases = PHASES.map((phase) =>
-    phase.questionIds.every((id) => id in answers),
-  );
-
-  // Show the first question after mount
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setMessages([{ role: 'assistant', content: QUESTIONS[0].text }]);
-      setIsTyping(false);
-    }, 800);
-    return () => clearTimeout(timer);
+    return () => {
+      if (navigateTimerRef.current) clearTimeout(navigateTimerRef.current);
+    };
   }, []);
 
-  // Scroll to bottom whenever messages change
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, isTyping]);
+  const triggerWiggle = useCallback(() => {
+    setWiggle(true);
+    setTimeout(() => setWiggle(false), 700);
+  }, []);
 
-  const handleAnswer = async (value: string | string[]) => {
-    const question = QUESTIONS[currentQuestionIndex];
+  const progress =
+    phase === 'welcome'
+      ? 0
+      : phase === 'questioning'
+        ? ((questionIndex + 1) / QUESTIONS.length) * 100
+        : 100;
 
-    // Display user answer
-    const displayValue = Array.isArray(value) ? value.join(', ') : value;
-    setMessages((prev) => [...prev, { role: 'user', content: displayValue }]);
+  const submitOnboarding = useCallback(
+    (finalAnswers: Record<string, string | string[]>) => {
+      setSubmitError(null);
+      apiSucceededRef.current = false;
+      completingStartedAtRef.current = Date.now();
+      setPhase('completing');
 
+      const techStackRaw = finalAnswers['techStack'];
+      const techStack =
+        typeof techStackRaw === 'string'
+          ? techStackRaw.split(',').map((t) => t.trim()).filter(Boolean)
+          : (techStackRaw as string[]);
+
+      completeOnboardingMutation.mutate({
+        payload: {
+          fullName: finalAnswers['fullName'] as string,
+          currentRole: finalAnswers['currentRole'] as string,
+          experienceLevel: finalAnswers['experienceLevel'] as string,
+          mentorshipStyle: finalAnswers['mentorshipStyle'] as string,
+          developmentGoals: finalAnswers['developmentGoals'] as string[],
+          techStack,
+          journalingFrequency: finalAnswers['journalingFrequency'] as string,
+        },
+      });
+    },
+    [completeOnboardingMutation],
+  );
+
+  const handleAnswer = (value: string | string[]) => {
+    if (isAdvancing) return;
+
+    const question = QUESTIONS[questionIndex];
     const newAnswers = { ...answers, [question.id]: value };
     setAnswers(newAnswers);
+    setIsAdvancing(true);
 
-    const nextIndex = currentQuestionIndex + 1;
+    const nextIndex = questionIndex + 1;
 
     if (nextIndex < QUESTIONS.length) {
-      // Show typing indicator, then next question
-      setIsTyping(true);
       setTimeout(() => {
-        setMessages((prev) => [
-          ...prev,
-          { role: 'assistant', content: QUESTIONS[nextIndex].text },
-        ]);
-        setIsTyping(false);
-        setCurrentQuestionIndex(nextIndex);
-      }, 900);
+        setQuestionIndex(nextIndex);
+        setIsAdvancing(false);
+      }, 280);
     } else {
-      // All questions answered
-        setIsTyping(true);
-        setTimeout(() => {
-          setMessages((prev) => [
-            ...prev,
-            {
-              role: 'assistant',
-              content:
-                "You're all set! Let me save your preferences and take you to your journal.",
-            },
-          ]);
-          setIsTyping(false);
-          setIsComplete(true);
-          setIsSubmitting(true);
-
-          const techStackRaw = newAnswers['techStack'];
-          const techStack = typeof techStackRaw === 'string'
-            ? techStackRaw.split(',').map((t) => t.trim()).filter(Boolean)
-            : (techStackRaw as string[]);
-
-          completeOnboardingMutation.mutate({
-            payload: {
-              fullName: newAnswers['fullName'] as string,
-              age: newAnswers['age'] ? Number(newAnswers['age']) : undefined,
-              currentRole: newAnswers['currentRole'] as string,
-              experienceLevel: newAnswers['experienceLevel'] as string,
-              mentorshipStyle: newAnswers['mentorshipStyle'] as string,
-              developmentGoals: newAnswers['developmentGoals'] as string[],
-              techStack,
-              workEnvironment: newAnswers['workEnvironment'] as string,
-              journalingFrequency: newAnswers['journalingFrequency'] as string,
-              journalingTime: newAnswers['journalingTime'] as string,
-              notificationPreferences: newAnswers['notificationPreferences'] as string[],
-            },
-          });
-        }, 1000);
+      setTimeout(() => {
+        submitOnboarding(newAnswers);
+        setIsAdvancing(false);
+      }, 400);
     }
   };
 
+  const currentQuestion = QUESTIONS[questionIndex];
+
   return (
-    <div className="min-h-screen bg-background flex">
-      {/* Sidebar - hidden on mobile */}
-      <aside className="hidden md:flex w-64 shrink-0 flex-col border-r border-border bg-muted/30 px-6 py-8">
-        <div className="mb-8">
-          <h2 className="text-lg font-bold">JuneBug</h2>
-          <p className="text-xs text-muted-foreground mt-0.5">Your journaling companion</p>
-        </div>
+    <div className="relative min-h-[min(100dvh,100vh)] bg-background">
+      <ProgressBar progress={progress} />
 
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-4">
-            Your Journey
+      {phase === 'welcome' && (
+        <ScreenShell stepKey="welcome">
+          <MascotAvatar size="lg" wiggle={wiggle} className="mb-8" />
+          <p className="text-sm font-medium text-primary">June</p>
+          <h1 className="mt-2 font-serif text-2xl leading-snug text-foreground md:text-[1.75rem]">
+            Hi! I&apos;m June.
+          </h1>
+          <p className="mt-4 max-w-sm text-base leading-relaxed text-muted-foreground">
+            I&apos;ll be your journaling companion — here to help you reflect, remember, and
+            grow. Ready to get set up?
           </p>
-          <ol className="space-y-0">
-            {PHASES.map((phase, i) => {
-              const isCompleted = completedPhases[i];
-              const isActive = i === currentPhaseIndex && !isComplete;
-              const isFuture = i > currentPhaseIndex;
+          <Button
+            className="mt-10 h-12 min-w-[160px] px-8 text-base"
+            size="lg"
+            onClick={() => {
+              triggerWiggle();
+              setPhase('questioning');
+            }}
+          >
+            Let&apos;s go
+          </Button>
+        </ScreenShell>
+      )}
 
-              return (
-                <li key={phase.label} className="flex gap-3">
-                  {/* Timeline line */}
-                  <div className="flex flex-col items-center">
-                    <div
-                      className={[
-                        'flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold transition-colors',
-                        isCompleted
-                          ? 'bg-primary text-primary-foreground'
-                          : isActive
-                          ? 'border-2 border-primary bg-background text-primary'
-                          : 'border-2 border-border bg-background text-muted-foreground',
-                      ].join(' ')}
-                    >
-                      {isCompleted ? <Check className="h-3.5 w-3.5" /> : i + 1}
-                    </div>
-                    {i < PHASES.length - 1 && (
-                      <div
-                        className={[
-                          'w-px flex-1 my-1 min-h-[24px]',
-                          isCompleted ? 'bg-primary' : 'bg-border',
-                        ].join(' ')}
-                      />
-                    )}
-                  </div>
+      {phase === 'questioning' && currentQuestion && (
+        <ScreenShell
+          stepKey={`question-${questionIndex}`}
+          dots={{ total: QUESTIONS.length, current: questionIndex }}
+        >
+          <MascotAvatar size="md" wiggle={wiggle} className="mb-8" />
+          <p className="text-sm font-medium text-primary">June asks</p>
+          <h2 className="mt-2 font-serif text-xl leading-snug text-foreground md:text-2xl">
+            {currentQuestion.text}
+          </h2>
+          {currentQuestion.hint && (
+            <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+              {currentQuestion.hint}
+            </p>
+          )}
+          {submitError && questionIndex === QUESTIONS.length - 1 && (
+            <p className="mt-4 text-sm text-destructive" role="alert">
+              {submitError}
+            </p>
+          )}
+          <div className="w-full">
+            <AnswerInput
+              key={currentQuestion.id}
+              question={currentQuestion}
+              onSubmit={handleAnswer}
+              onWiggle={triggerWiggle}
+              disabled={isAdvancing || completeOnboardingMutation.isPending}
+            />
+          </div>
+        </ScreenShell>
+      )}
 
-                  {/* Label */}
-                  <div className="pb-6 pt-0.5">
-                    <p
-                      className={[
-                        'text-sm font-medium',
-                        isCompleted || isActive ? 'text-foreground' : 'text-muted-foreground',
-                        isFuture ? 'opacity-60' : '',
-                      ].join(' ')}
-                    >
-                      {phase.label}
-                    </p>
-                  </div>
-                </li>
-              );
-            })}
-          </ol>
-        </div>
-      </aside>
+      {phase === 'completing' && (
+        <ScreenShell stepKey="completing">
+          <MascotAvatar size="lg" wiggle className="mb-8 motion-reduce:animate-none" />
+          <h2 className="font-serif text-xl leading-snug text-foreground md:text-2xl">
+            Setting up your journal...
+          </h2>
+          <p className="mt-3 max-w-sm text-sm leading-relaxed text-muted-foreground">
+            Just a moment while I personalize everything for you.
+          </p>
+          <LoadingDots />
+        </ScreenShell>
+      )}
 
-      {/* Main chat area */}
-      <div className="flex flex-1 flex-col">
-        {/* Chat header */}
-        <header className="border-b border-border px-6 py-4 flex items-center gap-3 bg-background">
-          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-bold select-none">
-            JB
-          </div>
-          <div>
-            <p className="text-sm font-semibold">JuneBug Setup</p>
-            <p className="text-xs text-muted-foreground">Let's personalize your experience</p>
-          </div>
-          {/* Mobile phase indicator */}
-          <div className="ml-auto flex items-center gap-1.5 md:hidden">
-            {PHASES.map((_, i) => (
-              <span
-                key={i}
-                className={[
-                  'h-1.5 w-1.5 rounded-full transition-colors',
-                  completedPhases[i]
-                    ? 'bg-primary'
-                    : i === currentPhaseIndex
-                    ? 'bg-primary/60'
-                    : 'bg-border',
-                ].join(' ')}
-              />
-            ))}
-          </div>
-        </header>
-
-        {/* Messages */}
-        <div className="flex-1 overflow-y-auto px-4 py-6 md:px-8">
-          <div className="max-w-xl mx-auto">
-            {messages.map((message, i) => (
-              <ChatMessage key={i} message={message} />
-            ))}
-            {isTyping && <TypingIndicator />}
-            <div ref={messagesEndRef} />
-          </div>
-        </div>
-
-        {/* Input area */}
-        {!isComplete && !isTyping && currentQuestion && (
-          <div className="border-t border-border bg-background px-4 py-4 md:px-8">
-            <div className="max-w-xl mx-auto">
-              <AnswerInput
-                key={currentQuestion.id}
-                question={currentQuestion}
-                onSubmit={handleAnswer}
-                isLoading={isSubmitting}
-              />
-            </div>
-          </div>
-        )}
-
-        {isComplete && isSubmitting && (
-          <div className="border-t border-border bg-background px-4 py-4 md:px-8">
-            <div className="max-w-xl mx-auto">
-              <p className="text-sm text-center text-muted-foreground">
-                Saving your preferences...
-              </p>
-            </div>
-          </div>
-        )}
-      </div>
+      {phase === 'done' && (
+        <ScreenShell stepKey="done">
+          <MascotAvatar size="lg" wiggle className="mb-8 motion-reduce:animate-none" />
+          <h2 className="font-serif text-xl leading-snug text-foreground md:text-2xl">
+            You&apos;re all set!
+          </h2>
+          <p className="mt-3 max-w-sm text-sm leading-relaxed text-muted-foreground">
+            Your journal is ready. See you inside.
+          </p>
+        </ScreenShell>
+      )}
     </div>
   );
 }

@@ -232,3 +232,62 @@
 .animate-bounce-slow {
   animation: bounce 1s ease-in-out infinite;
 }
+
+/* Gentle float for mascot idle state */
+@keyframes gentleFloat {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+.animate-gentle-float {
+  animation: gentleFloat 3s ease-in-out infinite;
+}
+
+/* Onboarding step entrance */
+@keyframes onboardingStepIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-onboarding-step-in {
+  animation: onboardingStepIn 300ms cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+}
+
+/* Onboarding loading dots */
+@keyframes onboardingDotPulse {
+  0%,
+  80%,
+  100% {
+    opacity: 0.35;
+    transform: scale(0.85);
+  }
+  40% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-onboarding-dot {
+  animation: onboardingDotPulse 1.2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-gentle-float,
+  .animate-happy-wiggle,
+  .animate-bounce-slow,
+  .animate-onboarding-step-in,
+  .animate-onboarding-dot {
+    animation: none;
+  }
+}
