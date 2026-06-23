@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router";
+import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useCompleteOnboardingMutation } from "@/hooks/api";
-import { Check } from "lucide-react";
+import type { AppUser } from "@/lib/api";
+import { Check, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -80,7 +82,23 @@ const QUESTIONS: Question[] = [
 	},
 ];
 
-const AUTO_ADVANCE_MS = 600;
+function isAnswerValid(
+	question: Question,
+	value: string | string[] | undefined,
+): boolean {
+	if (value === undefined) return false;
+	if (question.type === "text") {
+		return typeof value === "string" && value.trim().length > 0;
+	}
+	if (question.type === "radio") {
+		return typeof value === "string" && value.length > 0;
+	}
+	if (question.type === "checkbox") {
+		return Array.isArray(value) && value.length > 0;
+	}
+	return false;
+}
+
 const COMPLETING_MIN_DELAY_MS = 3200;
 const DONE_NAVIGATE_DELAY_MS = 1800;
 
@@ -153,19 +171,24 @@ function ProgressBar({ progress }: { progress: number }) {
 function ProgressDots({ total, current }: { total: number; current: number }) {
 	return (
 		<div
-			className="flex items-center justify-center gap-2 pt-8"
+			className="flex flex-col items-center gap-3 pt-8"
 			aria-label={`Question ${current + 1} of ${total}`}
 		>
-			{Array.from({ length: total }, (_, i) => (
-				<span
-					key={i}
-					className={cn(
-						"h-1.5 rounded-full transition-all duration-300 motion-reduce:transition-none",
-						i === current ? "w-6 bg-primary" : "w-1.5",
-						i < current ? "bg-primary/70" : i > current ? "bg-border" : "",
-					)}
-				/>
-			))}
+			<p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+				{current + 1} of {total}
+			</p>
+			<div className="flex items-center justify-center gap-2">
+				{Array.from({ length: total }, (_, i) => (
+					<span
+						key={i}
+						className={cn(
+							"h-1.5 rounded-full transition-all duration-300 motion-reduce:transition-none",
+							i === current ? "w-6 bg-primary" : "w-1.5",
+							i < current ? "bg-primary/70" : i > current ? "bg-border" : "",
+						)}
+					/>
+				))}
+			</div>
 		</div>
 	);
 }
@@ -220,98 +243,67 @@ function OptionCard({
 
 interface AnswerInputProps {
 	question: Question;
-	onSubmit: (value: string | string[]) => void;
-	onWiggle: () => void;
+	value: string | string[] | undefined;
+	onChange: (value: string | string[]) => void;
+	onContinue: () => void;
 	disabled: boolean;
 }
 
 function AnswerInput({
 	question,
-	onSubmit,
-	onWiggle,
+	value,
+	onChange,
+	onContinue,
 	disabled,
 }: AnswerInputProps) {
-	const [textValue, setTextValue] = useState("");
-	const [selectedRadio, setSelectedRadio] = useState("");
-	const [checkboxValues, setCheckboxValues] = useState<string[]>([]);
 	const inputRef = useRef<HTMLInputElement>(null);
-	const advanceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+	const textValue = typeof value === "string" ? value : "";
+	const selectedRadio =
+		question.type === "radio" && typeof value === "string" ? value : "";
+	const checkboxValues =
+		question.type === "checkbox" && Array.isArray(value) ? value : [];
 
 	useEffect(() => {
-		setTextValue("");
-		setSelectedRadio("");
-		setCheckboxValues([]);
 		if (question.type === "text") {
 			const timer = setTimeout(() => inputRef.current?.focus(), 100);
 			return () => clearTimeout(timer);
 		}
 	}, [question.id, question.type]);
 
-	useEffect(() => {
-		return () => {
-			if (advanceTimerRef.current) clearTimeout(advanceTimerRef.current);
-		};
-	}, []);
-
 	const handleRadioSelect = (option: string) => {
 		if (disabled) return;
-		setSelectedRadio(option);
-		onWiggle();
-		advanceTimerRef.current = setTimeout(() => {
-			onSubmit(option);
-		}, AUTO_ADVANCE_MS);
+		onChange(option);
 	};
 
 	const handleCheckboxToggle = (option: string) => {
 		if (disabled) return;
-		setCheckboxValues((prev) =>
-			prev.includes(option)
-				? prev.filter((v) => v !== option)
-				: [...prev, option],
-		);
-	};
-
-	const handleTextSubmit = () => {
-		if (!textValue.trim() || disabled) return;
-		onWiggle();
-		onSubmit(textValue.trim());
-	};
-
-	const handleCheckboxSubmit = () => {
-		if (checkboxValues.length === 0 || disabled) return;
-		onWiggle();
-		onSubmit(checkboxValues);
+		const next = checkboxValues.includes(option)
+			? checkboxValues.filter((v) => v !== option)
+			: [...checkboxValues, option];
+		onChange(next);
 	};
 
 	const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
 		if (e.key === "Enter") {
 			e.preventDefault();
-			handleTextSubmit();
+			if (isAnswerValid(question, textValue)) onContinue();
 		}
 	};
 
 	if (question.type === "text") {
 		return (
-			<div className="mt-8 space-y-4">
+			<div className="mt-8">
 				<Input
 					ref={inputRef}
 					type="text"
 					placeholder={question.placeholder}
 					value={textValue}
-					onChange={(e) => setTextValue(e.target.value)}
+					onChange={(e) => onChange(e.target.value)}
 					onKeyDown={handleKeyDown}
 					disabled={disabled}
 					className="h-12 border-2 bg-card text-center text-base md:text-lg"
 					aria-label={question.text}
 				/>
-				<Button
-					onClick={handleTextSubmit}
-					disabled={!textValue.trim() || disabled}
-					className="h-12 w-full text-base"
-					size="lg"
-				>
-					Continue
-				</Button>
 			</div>
 		);
 	}
@@ -325,7 +317,7 @@ function AnswerInput({
 						label={option}
 						selected={selectedRadio === option}
 						onClick={() => handleRadioSelect(option)}
-						disabled={disabled || Boolean(selectedRadio)}
+						disabled={disabled}
 						mode="radio"
 					/>
 				))}
@@ -335,27 +327,17 @@ function AnswerInput({
 
 	if (question.type === "checkbox" && question.options) {
 		return (
-			<div className="mt-8 space-y-4">
-				<div className="grid grid-cols-1 gap-3">
-					{question.options.map((option) => (
-						<OptionCard
-							key={option}
-							label={option}
-							selected={checkboxValues.includes(option)}
-							onClick={() => handleCheckboxToggle(option)}
-							disabled={disabled}
-							mode="checkbox"
-						/>
-					))}
-				</div>
-				<Button
-					onClick={handleCheckboxSubmit}
-					disabled={checkboxValues.length === 0 || disabled}
-					className="h-12 w-full text-base"
-					size="lg"
-				>
-					Continue
-				</Button>
+			<div className="mt-8 grid grid-cols-1 gap-3">
+				{question.options.map((option) => (
+					<OptionCard
+						key={option}
+						label={option}
+						selected={checkboxValues.includes(option)}
+						onClick={() => handleCheckboxToggle(option)}
+						disabled={disabled}
+						mode="checkbox"
+					/>
+				))}
 			</div>
 		);
 	}
@@ -363,25 +345,95 @@ function AnswerInput({
 	return null;
 }
 
+// ─── Step navigation ──────────────────────────────────────────────────────────
+
+function StepNavigation({
+	onBack,
+	onContinue,
+	showBack,
+	continueLabel,
+	continueDisabled,
+	isLoading,
+}: {
+	onBack?: () => void;
+	onContinue: () => void;
+	showBack?: boolean;
+	continueLabel: string;
+	continueDisabled?: boolean;
+	isLoading?: boolean;
+}) {
+	return (
+		<div
+			className={cn("w-full", showBack ? "pt-2" : "mt-10")}
+		>
+			<div
+				className={cn(
+					"flex w-full gap-3",
+					showBack ? "flex-row" : "flex-col items-center",
+				)}
+			>
+				{showBack && onBack && (
+					<Button
+						type="button"
+						variant="ghost"
+						size="lg"
+						onClick={onBack}
+						disabled={isLoading}
+						className="h-12 min-w-0 flex-1 gap-1.5 text-muted-foreground hover:text-foreground"
+					>
+						<ChevronLeft className="h-4 w-4 shrink-0" aria-hidden />
+						Back
+					</Button>
+				)}
+				<Button
+					type="button"
+					size="lg"
+					onClick={onContinue}
+					disabled={continueDisabled || isLoading}
+					className={cn(
+						"h-12 gap-1.5 text-base",
+						showBack ? "min-w-0 flex-[1.35]" : "min-w-[160px] px-8",
+					)}
+				>
+					{continueLabel}
+					{continueLabel !== "Finish setup" && (
+						<ChevronRight className="h-4 w-4 shrink-0" aria-hidden />
+					)}
+				</Button>
+			</div>
+		</div>
+	);
+}
+
 // ─── Screen shells ────────────────────────────────────────────────────────────
 
 function ScreenShell({
 	stepKey,
+	direction = "forward",
 	children,
 	dots,
+	footer,
 }: {
 	stepKey: string;
+	direction?: "forward" | "back";
 	children: React.ReactNode;
 	dots?: { total: number; current: number };
+	footer?: React.ReactNode;
 }) {
 	return (
 		<div
 			key={stepKey}
-			className="animate-onboarding-step-in flex min-h-[min(100dvh,100vh)] w-full flex-col items-center justify-center px-6 py-16"
+			className={cn(
+				"flex min-h-[min(100dvh,100vh)] w-full flex-col items-center justify-center px-6 py-16",
+				direction === "back"
+					? "animate-onboarding-step-in-back"
+					: "animate-onboarding-step-in-forward",
+			)}
 		>
 			<div className="mx-auto flex w-full max-w-[480px] flex-col items-center text-center">
 				{children}
 				{dots && <ProgressDots total={dots.total} current={dots.current} />}
+				{footer}
 			</div>
 		</div>
 	);
@@ -401,22 +453,34 @@ function LoadingDots() {
 
 export function OnboardingPage() {
 	const navigate = useNavigate();
+	const queryClient = useQueryClient();
 	const [phase, setPhase] = useState<FlowPhase>("welcome");
 	const [questionIndex, setQuestionIndex] = useState(0);
+	const [stepDirection, setStepDirection] = useState<"forward" | "back">(
+		"forward",
+	);
 	const [answers, setAnswers] = useState<Record<string, string | string[]>>({});
 	const [wiggle, setWiggle] = useState(false);
 	const [submitError, setSubmitError] = useState<string | null>(null);
-	const [isAdvancing, setIsAdvancing] = useState(false);
 	const navigateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const completingStartedAtRef = useRef<number | null>(null);
 	const apiSucceededRef = useRef(false);
+	const completedUserRef = useRef<AppUser | null>(null);
 
 	const goToDoneAndNavigate = useCallback(() => {
 		setPhase("done");
 		navigateTimerRef.current = setTimeout(() => {
+			// Prime onboarding status to onboarded so the destination guard
+			// (OnboardingGuard) doesn't bounce back to /onboarding, then refresh
+			// the rest of the app-user data. Deferring this until navigation is
+			// what preserves the completing/done delay sequence.
+			queryClient.setQueryData(["appUser", "onboarding", "status"], {
+				data: { isOnboarded: true, user: completedUserRef.current },
+			});
+			queryClient.invalidateQueries({ queryKey: ["appUser"] });
 			navigate("/entries");
 		}, DONE_NAVIGATE_DELAY_MS);
-	}, [navigate]);
+	}, [navigate, queryClient]);
 
 	const finishCompletingWhenReady = useCallback(() => {
 		const startedAt = completingStartedAtRef.current ?? Date.now();
@@ -427,8 +491,9 @@ export function OnboardingPage() {
 	}, [goToDoneAndNavigate]);
 
 	const completeOnboardingMutation = useCompleteOnboardingMutation({
-		onSuccess: () => {
+		onSuccess: (response) => {
 			apiSucceededRef.current = true;
+			completedUserRef.current = response.data;
 			finishCompletingWhenReady();
 		},
 		onError: () => {
@@ -440,7 +505,7 @@ export function OnboardingPage() {
 			);
 			setPhase("questioning");
 			setQuestionIndex(QUESTIONS.length - 1);
-			setIsAdvancing(false);
+			setStepDirection("back");
 		},
 	});
 
@@ -493,37 +558,80 @@ export function OnboardingPage() {
 		[completeOnboardingMutation],
 	);
 
-	const handleAnswer = (value: string | string[]) => {
-		if (isAdvancing) return;
-
-		const question = QUESTIONS[questionIndex];
-		const newAnswers = { ...answers, [question.id]: value };
-		setAnswers(newAnswers);
-		setIsAdvancing(true);
-
-		const nextIndex = questionIndex + 1;
-
-		if (nextIndex < QUESTIONS.length) {
-			setTimeout(() => {
-				setQuestionIndex(nextIndex);
-				setIsAdvancing(false);
-			}, 280);
-		} else {
-			setTimeout(() => {
-				submitOnboarding(newAnswers);
-				setIsAdvancing(false);
-			}, 400);
-		}
-	};
-
 	const currentQuestion = QUESTIONS[questionIndex];
+	const currentAnswer = currentQuestion
+		? answers[currentQuestion.id]
+		: undefined;
+	const isLastQuestion = questionIndex === QUESTIONS.length - 1;
+	const isQuestionValid = currentQuestion
+		? isAnswerValid(currentQuestion, currentAnswer)
+		: false;
+	const isBusy = completeOnboardingMutation.isPending;
+
+	const handleAnswerChange = useCallback(
+		(value: string | string[]) => {
+			if (!currentQuestion) return;
+			setAnswers((prev) => ({ ...prev, [currentQuestion.id]: value }));
+			if (submitError) setSubmitError(null);
+		},
+		[currentQuestion, submitError],
+	);
+
+	const goForward = useCallback(() => {
+		if (!currentQuestion || !isQuestionValid || isBusy) return;
+
+		triggerWiggle();
+
+		const normalizedValue =
+			currentQuestion.type === "text" && typeof currentAnswer === "string"
+				? currentAnswer.trim()
+				: currentAnswer!;
+		const newAnswers = { ...answers, [currentQuestion.id]: normalizedValue };
+		setAnswers(newAnswers);
+		setStepDirection("forward");
+
+		if (isLastQuestion) {
+			submitOnboarding(newAnswers);
+			return;
+		}
+
+		setQuestionIndex((index) => index + 1);
+	}, [
+		answers,
+		currentAnswer,
+		currentQuestion,
+		isBusy,
+		isLastQuestion,
+		isQuestionValid,
+		submitOnboarding,
+		triggerWiggle,
+	]);
+
+	const goBack = useCallback(() => {
+		if (isBusy) return;
+		setStepDirection("back");
+		setSubmitError(null);
+
+		if (questionIndex > 0) {
+			setQuestionIndex((index) => index - 1);
+			return;
+		}
+
+		setPhase("welcome");
+	}, [isBusy, questionIndex]);
+
+	const startQuestioning = useCallback(() => {
+		triggerWiggle();
+		setStepDirection("forward");
+		setPhase("questioning");
+	}, [triggerWiggle]);
 
 	return (
 		<div className="relative min-h-[min(100dvh,100vh)] bg-background">
 			<ProgressBar progress={progress} />
 
 			{phase === "welcome" && (
-				<ScreenShell stepKey="welcome">
+				<ScreenShell stepKey="welcome" direction={stepDirection}>
 					<MascotAvatar size="lg" wiggle={wiggle} className="mb-8" />
 					<p className="text-sm font-medium text-primary">June</p>
 					<h1 className="mt-2 font-serif text-2xl leading-snug text-foreground md:text-[1.75rem]">
@@ -533,23 +641,28 @@ export function OnboardingPage() {
 						I&apos;ll be your journaling companion — here to help you reflect,
 						remember, and grow. Ready to get set up?
 					</p>
-					<Button
-						className="mt-10 h-12 min-w-[160px] px-8 text-base"
-						size="lg"
-						onClick={() => {
-							triggerWiggle();
-							setPhase("questioning");
-						}}
-					>
-						Let&apos;s go
-					</Button>
+					<StepNavigation
+						onContinue={startQuestioning}
+						continueLabel="Let's go"
+					/>
 				</ScreenShell>
 			)}
 
 			{phase === "questioning" && currentQuestion && (
 				<ScreenShell
 					stepKey={`question-${questionIndex}`}
+					direction={stepDirection}
 					dots={{ total: QUESTIONS.length, current: questionIndex }}
+					footer={
+						<StepNavigation
+							showBack
+							onBack={goBack}
+							onContinue={goForward}
+							continueLabel={isLastQuestion ? "Finish setup" : "Continue"}
+							continueDisabled={!isQuestionValid}
+							isLoading={isBusy}
+						/>
+					}
 				>
 					<MascotAvatar size="md" wiggle={wiggle} className="mb-8" />
 					<p className="text-sm font-medium text-primary">June asks</p>
@@ -561,7 +674,7 @@ export function OnboardingPage() {
 							{currentQuestion.hint}
 						</p>
 					)}
-					{submitError && questionIndex === QUESTIONS.length - 1 && (
+					{submitError && isLastQuestion && (
 						<p className="mt-4 text-sm text-destructive" role="alert">
 							{submitError}
 						</p>
@@ -570,9 +683,10 @@ export function OnboardingPage() {
 						<AnswerInput
 							key={currentQuestion.id}
 							question={currentQuestion}
-							onSubmit={handleAnswer}
-							onWiggle={triggerWiggle}
-							disabled={isAdvancing || completeOnboardingMutation.isPending}
+							value={currentAnswer}
+							onChange={handleAnswerChange}
+							onContinue={goForward}
+							disabled={isBusy}
 						/>
 					</div>
 				</ScreenShell>

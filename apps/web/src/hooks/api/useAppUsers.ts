@@ -1,7 +1,6 @@
 import {
 	useQuery,
 	useMutation,
-	useQueryClient,
 	type UseMutationOptions,
 } from "@tanstack/react-query";
 import { appUsersApi, type AppUser } from "@/lib/api";
@@ -48,19 +47,9 @@ export function useCompleteOnboardingMutation(
 		"mutationFn"
 	>,
 ) {
-	const queryClient = useQueryClient();
-	const { onSuccess, ...restOptions } = options || {};
-
 	return useMutation({
-		...restOptions,
+		...options,
 		mutationFn: (variables: CompleteOnboardingVariables) =>
 			appUsersApi.completeOnboarding(variables),
-		onSuccess: (...args) => {
-			queryClient.invalidateQueries({ queryKey: ["appUser"] });
-			queryClient.invalidateQueries({ queryKey: ["appUser", "onboarding"] });
-			if (onSuccess) {
-				onSuccess(...args);
-			}
-		},
 	});
 }
