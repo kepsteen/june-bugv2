@@ -14,7 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { MemoriesTab } from '@/components/settings/MemoriesTab';
 import { useSession, signOut } from '@/lib/auth-client';
-import { ArrowLeft, User } from 'lucide-react';
+import { ArrowLeft, User, Sparkles } from 'lucide-react';
 import { useGetCurrentAppUserQuery } from '@/hooks/api';
 import type { AppUser } from '@/lib/api';
 
@@ -134,6 +134,16 @@ export function SettingsPage() {
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold">Settings</h1>
           <div className="flex items-center gap-2">
+            <Button
+              asChild
+              variant="outline"
+              className="border-primary/30 bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary"
+            >
+              <Link to="/upgrade">
+                <Sparkles className="h-4 w-4" />
+                Upgrade to Pro
+              </Link>
+            </Button>
             <ThemeToggle />
             <Button variant="outline" onClick={handleSignOut}>
               Sign Out

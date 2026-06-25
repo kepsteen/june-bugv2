@@ -6,6 +6,7 @@ import { SignInPage } from "@/pages/SignInPage";
 import { SignUpPage } from "@/pages/SignUpPage";
 import { ResetPasswordPage } from "@/pages/ResetPasswordPage";
 import { SettingsPage } from "@/pages/SettingsPage";
+import { UpgradePage } from "@/pages/UpgradePage";
 import { OnboardingPage } from "@/pages/OnboardingPage";
 import {
 	InternalDashboardAiPage,
@@ -140,6 +141,16 @@ export default function App() {
 						<ProtectedRoute>
 							<OnboardingGuard>
 								<SettingsPage />
+							</OnboardingGuard>
+						</ProtectedRoute>
+					}
+				/>
+				<Route
+					path="/upgrade"
+					element={
+						<ProtectedRoute>
+							<OnboardingGuard>
+								<UpgradePage />
 							</OnboardingGuard>
 						</ProtectedRoute>
 					}
