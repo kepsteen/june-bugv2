@@ -57,6 +57,20 @@
       "when": 1780673379348,
       "tag": "0011_outgoing_venus",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1782181788019,
+      "tag": "0012_mature_annihilus",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1782315000875,
+      "tag": "0013_slow_ken_ellis",
+      "breakpoints": true
     }
   ]
 }
