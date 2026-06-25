@@ -7,7 +7,7 @@ const envSchema = z.object({
 	PORT: z.coerce.number().default(3000),
 	DATABASE_URL: z.string().url(),
 	BETTER_AUTH_SECRET: z.string().min(32),
-	// PUBLIC_URL: z.string().url(),
+	PUBLIC_URL: z.string().url(),
 	BETTER_AUTH_URL: z.string().url(),
 	CLIENT_URL: z.string().url(),
 
@@ -30,8 +30,8 @@ const envSchema = z.object({
 
 	// Stripe
 	STRIPE_SECRET_KEY: z.string(),
-	STRIPE_WEBHOOK_SECRET: z.string().optional(),
-	STRIPE_PRICE_PRO: z.string().optional(),
+	STRIPE_WEBHOOK_SECRET: z.string(),
+	STRIPE_PRICE_PRO: z.string(),
 });
 
 const parsed = envSchema.parse(process.env);
