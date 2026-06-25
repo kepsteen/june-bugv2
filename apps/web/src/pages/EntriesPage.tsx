@@ -54,13 +54,17 @@ export function EntriesPage({ demo = false }: EntriesPageProps) {
   const { data: entriesData } = useGetAllEntriesQuery({
     enabled: isAuthenticated,
   });
-  const entries = demo ? (demoEntry ? [demoEntry] : []) : (entriesData?.data ?? []);
+  const entries = demo
+    ? (demoEntry ? [demoEntry] : [])
+    : (isAuthenticated ? (entriesData?.data ?? []) : []);
 
   // Fetch current entry
   const { data: entryData, isLoading: entryLoading } = useGetEntryByIdQuery(entryId, {
     enabled: isAuthenticated,
   });
-  const currentEntry = demo ? demoEntry : (entryData?.data ?? null);
+  const currentEntry = demo
+    ? demoEntry
+    : (isAuthenticated ? (entryData?.data ?? null) : null);
 
   // Fetch app user
   const { data: appUserData } = useGetCurrentAppUserQuery({

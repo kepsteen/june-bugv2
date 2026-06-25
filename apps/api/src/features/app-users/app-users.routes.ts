@@ -15,6 +15,7 @@ router.get('/me', AuthMiddleware(), asyncHandler(async (req: Request, res: Respo
 // PUT /onboarding - update onboarding data
 router.put('/onboarding', AuthMiddleware(), asyncHandler(async (req: Request, res: Response) => {
   const authUser = res.locals.user;
+  await appUsersService.findOrCreate({ authId: authUser.id, email: authUser.email });
   const {
     fullName,
     age,

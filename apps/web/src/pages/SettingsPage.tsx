@@ -14,6 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { MemoriesTab } from '@/components/settings/MemoriesTab';
 import { useSession, signOut } from '@/lib/auth-client';
+import { useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, User, Sparkles, CreditCard } from 'lucide-react';
 import { useGetCurrentAppUserQuery, useSubscriptionQuery } from '@/hooks/api';
 import { isActiveSubscription, type AppUser } from '@/lib/api';
@@ -97,6 +98,7 @@ function ProfileCard({ user, appUser }: { user: { name?: string | null; email?: 
 export function SettingsPage() {
   const { data: session, isPending } = useSession();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   const { data: appUserData } = useGetCurrentAppUserQuery({
     enabled: !!session?.user,
@@ -112,6 +114,7 @@ export function SettingsPage() {
 
   const handleSignOut = async () => {
     await signOut();
+    queryClient.clear();
     navigate('/sign-in');
   };
 

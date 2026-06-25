@@ -5,6 +5,8 @@
 export class AppError extends Error {
   public readonly statusCode: number;
   public readonly isOperational: boolean;
+  public readonly code?: string;
+  public readonly feature?: string;
   public context?: {
     // HTTP Request context
     method?: string;
@@ -21,10 +23,17 @@ export class AppError extends Error {
     timestamp?: string;
   };
 
-  constructor(message: string, statusCode: number = 500, isOperational: boolean = true) {
+  constructor(
+    message: string,
+    statusCode: number = 500,
+    isOperational: boolean = true,
+    options?: { code?: string; feature?: string },
+  ) {
     super(message);
     this.statusCode = statusCode;
     this.isOperational = isOperational;
+    this.code = options?.code;
+    this.feature = options?.feature;
 
     // Maintains proper prototype chain for instanceof checks
     Object.setPrototypeOf(this, new.target.prototype);

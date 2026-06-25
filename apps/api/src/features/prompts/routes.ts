@@ -6,6 +6,7 @@ import {
 } from "express";
 import { z } from "zod";
 import { AuthMiddleware } from "@/middleware/auth-middleware.js";
+import { requireEntitlement } from "@/middleware/entitlement-middleware.js";
 import { asyncHandler } from "@/lib/async-handler.js";
 import { validateBody } from "@/middleware/validation-middleware.js";
 import { appUsersService } from "../app-users/app-users.service.js";
@@ -55,6 +56,7 @@ router.post(
 router.post(
 	"/personalized/regenerate",
 	AuthMiddleware(),
+	requireEntitlement("prompts.regenerate"),
 	validateBody(personalizedPromptsBodySchema),
 	asyncHandler(async (req: Request, res: Response) => {
 		const appUser = await getAppUser(res);

@@ -72,3 +72,6 @@ export {
   useCreatePortalMutation,
   useInvalidateSubscription,
 } from './useSubscriptions';
+
+// Entitlements hooks
+export { useIsPro } from './useIsPro';

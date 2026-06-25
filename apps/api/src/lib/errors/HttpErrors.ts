@@ -35,3 +35,12 @@ export class ForbiddenError extends AppError {
     super(message, 403, true);
   }
 }
+
+/**
+ * Upgrade required error for subscription-gated features
+ */
+export class UpgradeRequiredError extends AppError {
+  constructor(feature: string, message: string = 'Upgrade required') {
+    super(message, 402, true, { code: 'upgrade_required', feature });
+  }
+}

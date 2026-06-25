@@ -1,3 +1,4 @@
+import { LoadingScreen } from "@/components/LoadingScreen";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router";
 import { useSession } from "@/lib/auth-client";
 import { useGetOnboardingStatusQuery } from "@/hooks/api";
@@ -16,14 +17,6 @@ import {
 	InternalDashboardQueuesPage,
 } from "@/pages/InternalDashboardPage";
 
-function LoadingScreen() {
-	return (
-		<div className="flex h-screen items-center justify-center">
-			<div className="text-muted-foreground text-sm">Loading...</div>
-		</div>
-	);
-}
-
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
 	const { data: session, isPending } = useSession();
 
@@ -36,12 +29,22 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 function AuthRoute({ children }: { children: React.ReactNode }) {
 	const { data: session, isPending } = useSession();
+	const isAuthenticated = !!session?.user;
 
-	if (isPending) {
+	const { data: onboardingStatus, isPending: statusPending } =
+		useGetOnboardingStatusQuery({ enabled: isAuthenticated });
+
+	if (isPending || (isAuthenticated && statusPending)) {
 		return <LoadingScreen />;
 	}
 
-	return session ? <Navigate to="/entries" /> : <>{children}</>;
+	if (isAuthenticated) {
+		const dest =
+			onboardingStatus?.data.isOnboarded === false ? "/onboarding" : "/entries";
+		return <Navigate to={dest} />;
+	}
+
+	return <>{children}</>;
 }
 
 function OnboardingGuard({ children }: { children: React.ReactNode }) {

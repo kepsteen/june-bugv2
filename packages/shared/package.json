@@ -7,5 +7,14 @@
   "exports": {
     ".": "./src/types/index.ts",
     "./types": "./src/types/index.ts"
+  },
+  "scripts": {
+    "test": "vitest",
+    "test:run": "vitest run",
+    "type-check": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3",
+    "vitest": "^4.0.18"
   }
 }

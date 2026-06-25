@@ -1,4 +1,8 @@
 import { z } from "zod";
+import {
+	ACTIVE_SUBSCRIPTION_STATUSES,
+	resolvePlan,
+} from "@starter/shared";
 
 export type BillingCadence = "monthly" | "yearly";
 
@@ -6,7 +10,7 @@ export const checkoutBodySchema = z.object({
 	cadence: z.enum(["monthly", "yearly"]).default("monthly"),
 });
 
-export const ACTIVE_SUBSCRIPTION_STATUSES = ["active", "trialing"] as const;
+export { ACTIVE_SUBSCRIPTION_STATUSES };
 
 export type SubscriptionCancellationFields = {
 	stripeStatus: string;
@@ -23,7 +27,7 @@ export function resolvePriceIdForCadence(
 }
 
 export function isActiveSubscriptionStatus(status: string): boolean {
-	return (ACTIVE_SUBSCRIPTION_STATUSES as readonly string[]).includes(status);
+	return resolvePlan(status) === "pro";
 }
 
 export function isSubscriptionScheduledToCancel(

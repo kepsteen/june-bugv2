@@ -40,9 +40,10 @@ export function errorHandler(
 
   // Handle other AppError instances
   if (err instanceof AppError) {
-    return res.status(err.statusCode).json({
-      error: err.message,
-    });
+    const body: Record<string, unknown> = { error: err.message };
+    if (err.code) body.code = err.code;
+    if (err.feature) body.feature = err.feature;
+    return res.status(err.statusCode).json(body);
   }
 
   // Fallback for unexpected ZodError (should be caught by validate middleware)

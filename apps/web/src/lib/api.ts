@@ -7,8 +7,27 @@ import type {
   MemoryStatus,
   PersonalizedPromptSuggestion,
 } from '@starter/shared';
+import { resolvePlan } from '@starter/shared';
 
 export type { MemoryCategory, MemoryStatus, PersonalizedPromptSuggestion };
+
+export class ApiRequestError extends Error {
+  readonly statusCode: number;
+  readonly code?: string;
+  readonly feature?: string;
+
+  constructor(
+    message: string,
+    statusCode: number,
+    options?: { code?: string; feature?: string },
+  ) {
+    super(message);
+    this.name = 'ApiRequestError';
+    this.statusCode = statusCode;
+    this.code = options?.code;
+    this.feature = options?.feature;
+  }
+}
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
@@ -21,8 +40,20 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   });
 
   if (!res.ok) {
-    const error = await res.json().catch(() => ({ message: 'Request failed' }));
-    throw new Error(error.message || `HTTP ${res.status}`);
+    const body = await res.json().catch(() => ({ error: 'Request failed' }));
+    const message =
+      (typeof body.error === 'string' ? body.error : undefined) ??
+      (typeof body.message === 'string' ? body.message : undefined) ??
+      `HTTP ${res.status}`;
+    const code = typeof body.code === 'string' ? body.code : undefined;
+    const feature = typeof body.feature === 'string' ? body.feature : undefined;
+
+    if (res.status === 402 && code === 'upgrade_required') {
+      const { showUpgradeToast } = await import('./upgrade-toast');
+      showUpgradeToast(message);
+    }
+
+    throw new ApiRequestError(message, res.status, { code, feature });
   }
 
   if (res.status === 204) return undefined as T;
@@ -261,10 +292,7 @@ export function isActiveSubscription(
   subscription: Subscription | null | undefined,
 ): boolean {
   if (!subscription) return false;
-  return (
-    subscription.stripeStatus === 'active' ||
-    subscription.stripeStatus === 'trialing'
-  );
+  return resolvePlan(subscription.stripeStatus) === 'pro';
 }
 
 export function isSubscriptionScheduledToCancel(

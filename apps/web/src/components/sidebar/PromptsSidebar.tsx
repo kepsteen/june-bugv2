@@ -1,7 +1,13 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { X, ChevronLeft, Briefcase, Trophy, Bug, Lightbulb, Loader2, RefreshCw } from 'lucide-react';
-import { useGetPersonalizedPromptsQuery, useRegeneratePersonalizedPromptsMutation } from '@/hooks/api';
+import { useGetPersonalizedPromptsQuery, useRegeneratePersonalizedPromptsMutation, useIsPro } from '@/hooks/api';
 import type { MemoryCategory } from '@/lib/api';
 
 interface Category {
@@ -90,6 +96,7 @@ export function PromptsSidebar({
 }: PromptsSidebarProps) {
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const regenerateMutation = useRegeneratePersonalizedPromptsMutation();
+  const { isPro } = useIsPro();
   const { data, isLoading, isError, refetch, isRefetching } = useGetPersonalizedPromptsQuery(
     {
       entryId: entryId ?? '',
@@ -164,22 +171,35 @@ export function PromptsSidebar({
               })()}
               <h2 className="text-sm font-semibold">{selectedCategory.title}</h2>
               {!demo && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="ml-auto h-7 w-7"
-                  disabled={!entryId || regenerateMutation.isPending}
-                  onClick={() => {
-                    if (!entryId) return;
-                    regenerateMutation.mutate({
-                      entryId,
-                      focusCategory: selectedCategory.focusCategory,
-                      entryDraft: entryDraft ?? undefined,
-                    });
-                  }}
-                >
-                  <RefreshCw className={`h-4 w-4 ${regenerateMutation.isPending ? 'animate-spin' : ''}`} />
-                </Button>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="ml-auto inline-flex">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          disabled={!entryId || regenerateMutation.isPending || !isPro}
+                          onClick={() => {
+                            if (!entryId || !isPro) return;
+                            regenerateMutation.mutate({
+                              entryId,
+                              focusCategory: selectedCategory.focusCategory,
+                              entryDraft: entryDraft ?? undefined,
+                            });
+                          }}
+                        >
+                          <RefreshCw className={`h-4 w-4 ${regenerateMutation.isPending ? 'animate-spin' : ''}`} />
+                        </Button>
+                      </span>
+                    </TooltipTrigger>
+                    {!isPro ? (
+                      <TooltipContent side="bottom">
+                        Refreshing prompts is a Pro feature
+                      </TooltipContent>
+                    ) : null}
+                  </Tooltip>
+                </TooltipProvider>
               )}
             </div>
 
