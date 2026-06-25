@@ -66,6 +66,7 @@ export const appUsers = pgTable('app_users', {
   customScheduleDays: jsonb('custom_schedule_days').$type<string[]>(),
   journalingTime: text('journaling_time'),
   notificationPreferences: jsonb('notification_preferences').$type<string[]>(),
+  stripeCustomerId: text('stripe_customer_id').unique(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });

@@ -16,6 +16,11 @@ const appUsersServiceRaw = {
     return found ?? null;
   },
 
+  async findByStripeCustomerId({ stripeCustomerId }: { stripeCustomerId: string }): Promise<AppUser | null> {
+    const [found] = await db.select().from(appUsers).where(eq(appUsers.stripeCustomerId, stripeCustomerId));
+    return found ?? null;
+  },
+
   async findOrCreate({ authId, email }: { authId: string; email?: string }): Promise<AppUser> {
     const existing = await appUsersServiceRaw.findByAuthId({ authId });
     if (existing) return existing;
@@ -36,6 +41,16 @@ const appUsersServiceRaw = {
   async getOnboardingStatus({ authId }: { authId: string }): Promise<{ isOnboarded: boolean; user: AppUser | null }> {
     const user = await appUsersServiceRaw.findByAuthId({ authId });
     return { isOnboarded: user?.isOnboarded ?? false, user };
+  },
+
+  async setStripeCustomerId({ id, stripeCustomerId }: { id: string; stripeCustomerId: string }): Promise<AppUser> {
+    const [updated] = await db
+      .update(appUsers)
+      .set({ stripeCustomerId, updatedAt: new Date() })
+      .where(eq(appUsers.id, id))
+      .returning();
+    if (!updated) throw new NotFoundError('User not found');
+    return updated;
   },
 };
 

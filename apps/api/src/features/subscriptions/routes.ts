@@ -1,6 +1,7 @@
-import { asyncHandler } from "@/lib/async-handler";
-import { AuthMiddleware } from "@/middleware/auth-middleware";
-import { validateBody } from "@/middleware/validation-middleware";
+import { asyncHandler } from "@/lib/async-handler.js";
+import { AuthMiddleware } from "@/middleware/auth-middleware.js";
+import { appUsersService } from "../app-users/app-users.service.js";
+import { subscriptionsService } from "./services/service.js";
 import {
 	Router,
 	type Request,
@@ -10,26 +11,49 @@ import {
 
 const router: RouterType = Router();
 
+async function getAppUser(res: Response) {
+	const authUser = res.locals.user;
+	return appUsersService.findOrCreate({
+		authId: authUser.id,
+		email: authUser.email,
+	});
+}
+
+// POST /checkout — start a subscription purchase, return the Stripe URL
 router.post(
-	"/subscriptions/create-checkout-session",
+	"/checkout",
 	AuthMiddleware(),
-	validateBody(personalizedPromptsBodySchema),
 	asyncHandler(async (req: Request, res: Response) => {
 		const appUser = await getAppUser(res);
-		const entryId = req.body.entryId as string;
-		const focusCategory = req.body.focusCategory as
-			| (typeof memoryCategoryEnum.enumValues)[number]
-			| undefined;
-		const entryDraft =
-			typeof req.body.entryDraft === "string" ? req.body.entryDraft : undefined;
-
-		const data = await promptsService.getOrCreateForEntry({
-			userId: appUser.id,
-			entryId,
-			focusCategory,
-			entryDraft,
+		const result = await subscriptionsService.createCheckoutSession({
+			appUser,
 		});
-
-		res.json({ data });
+		return res.json({ data: result.url });
 	}),
 );
+
+// POST /portal — open the Stripe billing portal, return the URL
+router.post(
+	"/portal",
+	AuthMiddleware(),
+	asyncHandler(async (req: Request, res: Response) => {
+		const appUser = await getAppUser(res);
+		const result = await subscriptionsService.createPortalSession({ appUser });
+		res.json({ data: result.url });
+	}),
+);
+
+// GET /me — current subscription state for this user
+router.get(
+	"/me",
+	AuthMiddleware(),
+	asyncHandler(async (req: Request, res: Response) => {
+		const appUser = await getAppUser(res);
+		const result = await subscriptionsService.getByAppUserId({
+			appUserId: appUser.id,
+		});
+		res.json({ data: result });
+	}),
+);
+
+export default router;

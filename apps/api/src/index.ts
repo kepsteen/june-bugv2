@@ -20,6 +20,7 @@ import { uploadsRoutes } from './features/uploads/index.js';
 import { memoriesRoutes } from './features/memories/index.js';
 import { promptsRoutes } from './features/prompts/index.js';
 import { observabilityRoutes } from './features/observability/index.js';
+import { subscriptionsRoutes, subscriptionsWebhookHandler } from './features/subscriptions/index.js';
 
 const app = express();
 
@@ -29,6 +30,11 @@ if (env.NODE_ENV === 'production') {
 
 app.use(cors(corsConfig));
 app.all('/api/auth/*', toNodeHandler(auth));
+app.post(
+  '/api/subscriptions/webhook',
+  express.raw({ type: 'application/json' }),
+  subscriptionsWebhookHandler,
+);
 app.use(express.json());
 app.use(requestLogger);
 
@@ -47,6 +53,7 @@ app.use('/api/uploads', uploadsRoutes);
 app.use('/api/memories', memoriesRoutes);
 app.use('/api/prompts', promptsRoutes);
 app.use('/api/internal/observability', observabilityRoutes);
+app.use('/api/subscriptions', subscriptionsRoutes);
 
 const publicDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '../public');
 if (fs.existsSync(publicDir)) {
