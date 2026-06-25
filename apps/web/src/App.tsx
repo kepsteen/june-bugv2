@@ -7,6 +7,7 @@ import { SignUpPage } from "@/pages/SignUpPage";
 import { ResetPasswordPage } from "@/pages/ResetPasswordPage";
 import { SettingsPage } from "@/pages/SettingsPage";
 import { UpgradePage } from "@/pages/UpgradePage";
+import { BillingPage } from "@/pages/BillingPage";
 import { OnboardingPage } from "@/pages/OnboardingPage";
 import {
 	InternalDashboardAiPage,
@@ -141,6 +142,16 @@ export default function App() {
 						<ProtectedRoute>
 							<OnboardingGuard>
 								<SettingsPage />
+							</OnboardingGuard>
+						</ProtectedRoute>
+					}
+				/>
+				<Route
+					path="/settings/billing"
+					element={
+						<ProtectedRoute>
+							<OnboardingGuard>
+								<BillingPage />
 							</OnboardingGuard>
 						</ProtectedRoute>
 					}

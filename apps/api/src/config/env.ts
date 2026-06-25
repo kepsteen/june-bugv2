@@ -32,6 +32,7 @@ const envSchema = z.object({
 	STRIPE_SECRET_KEY: z.string(),
 	STRIPE_WEBHOOK_SECRET: z.string(),
 	STRIPE_PRICE_PRO: z.string(),
+	STRIPE_PRICE_PRO_YEARLY: z.string(),
 });
 
 const parsed = envSchema.parse(process.env);

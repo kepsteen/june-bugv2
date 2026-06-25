@@ -14,9 +14,9 @@ import { Badge } from '@/components/ui/badge';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { MemoriesTab } from '@/components/settings/MemoriesTab';
 import { useSession, signOut } from '@/lib/auth-client';
-import { ArrowLeft, User, Sparkles } from 'lucide-react';
-import { useGetCurrentAppUserQuery } from '@/hooks/api';
-import type { AppUser } from '@/lib/api';
+import { ArrowLeft, User, Sparkles, CreditCard } from 'lucide-react';
+import { useGetCurrentAppUserQuery, useSubscriptionQuery } from '@/hooks/api';
+import { isActiveSubscription, type AppUser } from '@/lib/api';
 
 function getInitials(name: string | null | undefined): string {
   if (!name) return '?';
@@ -102,7 +102,12 @@ export function SettingsPage() {
     enabled: !!session?.user,
   });
 
+  const { data: subscriptionData } = useSubscriptionQuery({
+    enabled: !!session?.user,
+  });
+
   const appUser = appUserData?.data;
+  const isPro = isActiveSubscription(subscriptionData?.data);
   const user = session?.user;
 
   const handleSignOut = async () => {
@@ -134,16 +139,25 @@ export function SettingsPage() {
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold">Settings</h1>
           <div className="flex items-center gap-2">
-            <Button
-              asChild
-              variant="outline"
-              className="border-primary/30 bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary"
-            >
-              <Link to="/upgrade">
-                <Sparkles className="h-4 w-4" />
-                Upgrade to Pro
-              </Link>
-            </Button>
+            {isPro ? (
+              <Button asChild variant="outline">
+                <Link to="/settings/billing">
+                  <CreditCard className="h-4 w-4" />
+                  Manage billing
+                </Link>
+              </Button>
+            ) : (
+              <Button
+                asChild
+                variant="outline"
+                className="border-primary/30 bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary"
+              >
+                <Link to="/upgrade">
+                  <Sparkles className="h-4 w-4" />
+                  Upgrade to Pro
+                </Link>
+              </Button>
+            )}
             <ThemeToggle />
             <Button variant="outline" onClick={handleSignOut}>
               Sign Out

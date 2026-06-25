@@ -8,12 +8,18 @@ import {
 	PenLine,
 	Lock,
 	Leaf,
+	ExternalLink,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import {
+	useCreateCheckoutMutation,
+	useCreatePortalMutation,
+	useSubscriptionQuery,
+} from "@/hooks/api";
+import { isActiveSubscription, type BillingCycle } from "@/lib/api";
 
-type BillingCycle = "monthly" | "yearly";
-type UpgradeState = "idle" | "loading" | "done";
+type UpgradeState = "idle" | "loading";
 
 const PRICING: Record<
 	BillingCycle,
@@ -122,14 +128,47 @@ export function UpgradePage() {
 	const navigate = useNavigate();
 	const [cycle, setCycle] = useState<BillingCycle>("yearly");
 	const [state, setState] = useState<UpgradeState>("idle");
+	const [checkoutError, setCheckoutError] = useState<string | null>(null);
+
+	const { data: subscriptionData } = useSubscriptionQuery();
+	const isPro = isActiveSubscription(subscriptionData?.data);
+
+	const checkoutMutation = useCreateCheckoutMutation({
+		onSuccess: (response) => {
+			window.location.href = response.data;
+		},
+		onError: (error) => {
+			setState("idle");
+			setCheckoutError(error.message);
+		},
+	});
+
+	const portalMutation = useCreatePortalMutation({
+		onSuccess: (response) => {
+			window.location.href = response.data;
+		},
+		onError: (error) => {
+			setCheckoutError(error.message);
+		},
+	});
 
 	const price = PRICING[cycle];
 
-	// Hard-coded mutation — wiring lives elsewhere. Just fakes a checkout round-trip.
 	const handleUpgrade = () => {
+		setCheckoutError(null);
 		setState("loading");
-		window.setTimeout(() => setState("done"), 1100);
+		checkoutMutation.mutate({ cadence: cycle });
 	};
+
+	const handleManageSubscription = () => {
+		setCheckoutError(null);
+		portalMutation.mutate();
+	};
+
+	const isBusy =
+		state === "loading" ||
+		checkoutMutation.isPending ||
+		portalMutation.isPending;
 
 	return (
 		<div className="min-h-screen bg-background">
@@ -211,27 +250,47 @@ export function UpgradePage() {
 								</p>
 
 								<div className="mt-7">
-									{state === "done" ? (
-										<div className="rounded-xl bg-primary/10 px-4 py-3 text-center">
-											<p className="flex items-center justify-center gap-2 font-medium text-primary">
-												<Check className="h-4 w-4" />
-												You're on Pro
-											</p>
-											<p className="mt-1 text-xs text-muted-foreground">
-												Thank you for making room for this.
-											</p>
+									{isPro ? (
+										<div className="space-y-3">
+											<div className="rounded-xl bg-primary/10 px-4 py-3 text-center">
+												<p className="flex items-center justify-center gap-2 font-medium text-primary">
+													<Check className="h-4 w-4" />
+													You're on Pro
+												</p>
+												<p className="mt-1 text-xs text-muted-foreground">
+													Thank you for making room for this.
+												</p>
+											</div>
+											<Button
+												variant="outline"
+												size="lg"
+												className="h-11 w-full text-base"
+												onClick={handleManageSubscription}
+												disabled={isBusy}
+											>
+												<ExternalLink className="h-4 w-4" />
+												{portalMutation.isPending
+													? "Opening portal…"
+													: "Manage subscription"}
+											</Button>
 										</div>
 									) : (
 										<Button
 											size="lg"
 											className="h-11 w-full text-base"
 											onClick={handleUpgrade}
-											disabled={state === "loading"}
+											disabled={isBusy}
 										>
-											{state === "loading" ? "One moment…" : "Upgrade to Pro"}
+											{isBusy ? "One moment…" : "Upgrade to Pro"}
 										</Button>
 									)}
 								</div>
+
+								{checkoutError && (
+									<p className="mt-3 text-center text-xs text-destructive">
+										{checkoutError}
+									</p>
+								)}
 
 								<p className="mt-4 flex items-center justify-center gap-1.5 text-center text-xs text-muted-foreground">
 									<Lock className="h-3 w-3" />

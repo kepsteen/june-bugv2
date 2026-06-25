@@ -107,6 +107,13 @@ const subscriptionsServiceRaw = {
 			stripeCurrentPeriodStart: new Date(item.current_period_start * 1000),
 			stripeCurrentPeriodEnd: new Date(item.current_period_end * 1000),
 			stripeStatus: subscription.status,
+			stripeCancelAtPeriodEnd: subscription.cancel_at_period_end,
+			stripeCancelAt: subscription.cancel_at
+				? new Date(subscription.cancel_at * 1000)
+				: null,
+			stripeCanceledAt: subscription.canceled_at
+				? new Date(subscription.canceled_at * 1000)
+				: null,
 		};
 
 		await db
@@ -121,6 +128,9 @@ const subscriptionsServiceRaw = {
 					stripeCurrentPeriodStart: values.stripeCurrentPeriodStart,
 					stripeCurrentPeriodEnd: values.stripeCurrentPeriodEnd,
 					stripeStatus: values.stripeStatus,
+					stripeCancelAtPeriodEnd: values.stripeCancelAtPeriodEnd,
+					stripeCancelAt: values.stripeCancelAt,
+					stripeCanceledAt: values.stripeCanceledAt,
 					updatedAt: new Date(),
 				},
 			});

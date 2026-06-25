@@ -50,6 +50,7 @@ Optional (features degrade gracefully without them):
 - `OPENAI_API_KEY` — AI title generation
 - `AWS_*` + `AWS_S3_BUCKET` — File uploads
 - `RESEND_API_KEY` — Email
+- `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` / `STRIPE_PRICE_PRO` / `STRIPE_PRICE_PRO_YEARLY` — Subscriptions & billing
 
 ## Database: Creating & Migrating
 
@@ -148,7 +149,7 @@ Set these in the Railway dashboard (see also `.env.example` production comments)
 | `BETTER_AUTH_SECRET` | Yes | Min 32-char random string |
 | `BETTER_AUTH_URL` | No | Defaults to `PUBLIC_URL` |
 | `CLIENT_URL` | No | Defaults to `PUBLIC_URL` |
-| `GITHUB_CLIENT_*`, `OPENAI_API_KEY`, `AWS_*`, `RESEND_API_KEY` | No | Same optional keys as local dev |
+| `GITHUB_CLIENT_*`, `OPENAI_API_KEY`, `AWS_*`, `RESEND_API_KEY`, `STRIPE_*` | No | Same optional keys as local dev |
 
 `VITE_API_URL` is **not** needed in production. GitHub OAuth callback (if enabled): `https://<your-domain>/api/auth/callback/github`.
 

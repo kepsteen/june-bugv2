@@ -1,5 +1,5 @@
 import { relations } from "drizzle-orm";
-import { pgTable, uuid, text, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, timestamp, boolean } from "drizzle-orm/pg-core";
 import { appUsers } from "../app-users/app-users.table";
 
 export const subscriptions = pgTable("subscriptions", {
@@ -14,6 +14,11 @@ export const subscriptions = pgTable("subscriptions", {
 	stripeCurrentPeriodStart: timestamp("stripe_current_period_start").notNull(),
 	stripeCurrentPeriodEnd: timestamp("stripe_current_period_end").notNull(),
 	stripeStatus: text("stripe_status").notNull(),
+	stripeCancelAtPeriodEnd: boolean("stripe_cancel_at_period_end")
+		.notNull()
+		.default(false),
+	stripeCancelAt: timestamp("stripe_cancel_at"),
+	stripeCanceledAt: timestamp("stripe_canceled_at"),
 	createdAt: timestamp("created_at").defaultNow().notNull(),
 	updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

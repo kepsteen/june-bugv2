@@ -1,6 +1,13 @@
+import { env } from "@/config/env.js";
 import { asyncHandler } from "@/lib/async-handler.js";
 import { AuthMiddleware } from "@/middleware/auth-middleware.js";
+import { validateBody } from "@/middleware/validation-middleware.js";
 import { appUsersService } from "../app-users/app-users.service.js";
+import {
+	checkoutBodySchema,
+	resolvePriceIdForCadence,
+	type BillingCadence,
+} from "./helpers/billing.helpers.js";
 import { subscriptionsService } from "./services/service.js";
 import {
 	Router,
@@ -23,10 +30,17 @@ async function getAppUser(res: Response) {
 router.post(
 	"/checkout",
 	AuthMiddleware(),
+	validateBody(checkoutBodySchema),
 	asyncHandler(async (req: Request, res: Response) => {
 		const appUser = await getAppUser(res);
+		const cadence = req.body.cadence as BillingCadence;
+		const priceId = resolvePriceIdForCadence(cadence, {
+			monthly: env.STRIPE_PRICE_PRO,
+			yearly: env.STRIPE_PRICE_PRO_YEARLY,
+		});
 		const result = await subscriptionsService.createCheckoutSession({
 			appUser,
+			priceId,
 		});
 		return res.json({ data: result.url });
 	}),
