@@ -5,11 +5,12 @@ const API_BASE =
 import type {
   MemoryCategory,
   MemoryStatus,
+  MemoryTier,
   PersonalizedPromptSuggestion,
 } from '@starter/shared';
 import { resolvePlan } from '@starter/shared';
 
-export type { MemoryCategory, MemoryStatus, PersonalizedPromptSuggestion };
+export type { MemoryCategory, MemoryStatus, MemoryTier, PersonalizedPromptSuggestion };
 
 export class ApiRequestError extends Error {
   readonly statusCode: number;
@@ -376,6 +377,7 @@ export interface UserMemory {
   id: string;
   userId: string;
   category: MemoryCategory;
+  tier: MemoryTier;
   title: string;
   summary: string;
   evidenceEntryId?: string | null;
@@ -398,11 +400,7 @@ export interface UserMemory {
 
 export interface PersonalizedPromptsResult {
   prompts: PersonalizedPromptSuggestion[];
-  retrieval: {
-    structuredCount: number;
-    semanticCount: number;
-    consideredCount: number;
-  };
+  memoryCount: number;
 }
 
 // Observability Types

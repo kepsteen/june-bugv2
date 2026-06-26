@@ -80,7 +80,7 @@ export function EntriesPage({ demo = false }: EntriesPageProps) {
   }, [entries, entryId, isAuthenticated, navigate]);
 
   useEffect(() => {
-    if (!isAuthenticated || !currentEntry?.id) return;
+    if (!isAuthenticated || !currentEntry?.id || !currentEntry.plainText?.trim()) return;
 
     for (const category of promptCategories) {
       void queryClient.prefetchQuery({

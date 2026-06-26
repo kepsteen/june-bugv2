@@ -1,452 +1,256 @@
-import { randomUUID } from 'node:crypto';
-import { and, desc, eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, isNull, or, sql } from 'drizzle-orm';
 import { db } from '@/lib/db/index.js';
 import { entries } from '@/features/entries/entries.table.js';
 import { wrapService } from '@/lib/service-wrapper.js';
-import { observabilityService } from '@/features/observability/observability.service.js';
+import { memoryEvents, userMemories, type UserMemory } from '../table.js';
 import {
-  buildMemoryProcessKey,
-  MEMORY_JOB_VERSION,
-  type MemoryEntryChangedJob,
-} from '@/lib/queue/memory-queue.js';
-import {
-  memoryEvents,
-  userMemories,
-  type UserMemory,
-  type NewUserMemory,
-} from '../table.js';
-import { upsertMemoryEmbedding } from '../helpers/embedding.helpers.js';
-import {
-  buildCanonicalKey,
-  extractMemoriesFromEntry,
-  normalizeForKey,
+  callCurator,
+  CORE_CAP,
+  WORKING_CAP,
+  type CuratorStoreEntry,
 } from '../helpers/pipeline.helpers.js';
-
-export class MemoryJobValidationError extends Error {}
-
-const MAX_RETRIES = 3;
-
-const categoryImportance: Record<UserMemory['category'], number> = {
-  goal: 0.95,
-  project: 0.9,
-  milestone: 0.88,
-  blocker: 0.85,
-  win: 0.9,
-  learning: 0.75,
-  skill_growth: 0.78,
-  preference: 0.6,
-  habit: 0.65,
-  relationship: 0.65,
-  value: 0.6,
-  other: 0.45,
-};
+import type { Entry } from '@/features/entries/entries.table.js';
+import type { MemoryOp } from '@starter/shared';
 
 function clamp(value: number, min = 0, max = 1) {
   return Math.max(min, Math.min(max, value));
 }
 
-function delay(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+async function loadActiveStore(userId: string): Promise<UserMemory[]> {
+  return db
+    .select()
+    .from(userMemories)
+    .where(and(eq(userMemories.userId, userId), eq(userMemories.status, 'active')))
+    .limit(CORE_CAP + WORKING_CAP + 8);
 }
 
-async function runEntryChangedJobWithRetries(job: MemoryEntryChangedJob) {
-  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-    try {
-      await processEntryChangedJob({ payload: job, retryCount: attempt });
-      return;
-    } catch (error) {
-      if (error instanceof MemoryJobValidationError) {
-        console.error('[memory-pipeline] Non-retriable job validation error:', error.message);
-        return;
-      }
+function validateOps(
+  ops: MemoryOp[],
+  store: UserMemory[],
+): { valid: true } | { valid: false; reason: string } {
+  const storeIds = new Set(store.map((m) => m.id));
 
-      if (attempt < MAX_RETRIES) {
-        const nextRetryCount = attempt + 1;
-        const delayMs = Math.min(30_000, 1_000 * 2 ** nextRetryCount);
-        console.warn(`[memory-pipeline] Retrying memory job (${nextRetryCount}/${MAX_RETRIES})`);
-        await observabilityService.recordQueueJobEvent({
-          jobId: job.jobId,
-          jobType: 'memory_entry_changed',
-          userId: job.userId,
-          entryId: job.entryId,
-          status: 'retrying',
-          retryCount: attempt,
-          metadata: { nextRetryCount, entryId: job.entryId },
-        }).catch((e) => console.error('[memory-pipeline] Failed to record retry event:', e));
-        await delay(delayMs);
-        continue;
-      }
+  for (const op of ops) {
+    if (op.op !== 'create' && !storeIds.has(op.id)) {
+      return { valid: false, reason: `op '${op.op}' references unknown id ${op.id}` };
+    }
+  }
 
-      console.error('[memory-pipeline] Max retries reached:', error);
-      await observabilityService.recordQueueJobEvent({
-        jobId: job.jobId,
-        jobType: 'memory_entry_changed',
-        userId: job.userId,
-        entryId: job.entryId,
-        status: 'failed',
-        retryCount: attempt,
-        outcome: 'max_retries_exceeded',
-        errorMessage: error instanceof Error ? error.message : 'Unknown error',
-      }).catch((e) => console.error('[memory-pipeline] Failed to record failure event:', e));
+  const coreIds = new Set(store.filter((m) => m.tier === 'core').map((m) => m.id));
+  const workingIds = new Set(store.filter((m) => m.tier === 'working').map((m) => m.id));
+
+  for (const op of ops) {
+    if (op.op === 'create') {
+      if (op.tier === 'core') coreIds.add(`_new_${coreIds.size}`);
+      else workingIds.add(`_new_${workingIds.size}`);
+    } else if (op.op === 'promote') {
+      workingIds.delete(op.id);
+      coreIds.add(op.id);
+    } else if (op.op === 'demote') {
+      coreIds.delete(op.id);
+      workingIds.add(op.id);
+    } else if (op.op === 'delete') {
+      coreIds.delete(op.id);
+      workingIds.delete(op.id);
+    }
+  }
+
+  if (coreIds.size > CORE_CAP) {
+    return { valid: false, reason: `core tier would reach ${coreIds.size} > cap ${CORE_CAP}` };
+  }
+  if (workingIds.size > WORKING_CAP) {
+    return {
+      valid: false,
+      reason: `working tier would reach ${workingIds.size} > cap ${WORKING_CAP}`,
+    };
+  }
+
+  return { valid: true };
+}
+
+async function applyOps(ops: MemoryOp[], store: UserMemory[], entry: Entry): Promise<void> {
+  const storeById = new Map(store.map((m) => [m.id, m]));
+  const now = new Date();
+
+  for (const op of ops) {
+    if (op.op === 'create') {
+      const [created] = await db
+        .insert(userMemories)
+        .values({
+          userId: entry.userId,
+          category: op.category,
+          tier: op.tier,
+          title: op.fact.slice(0, 120),
+          summary: op.fact,
+          evidenceEntryId: entry.id,
+          importance: clamp(op.importance),
+          status: 'active',
+          source: 'entry',
+          firstSeenAt: now,
+          lastSeenAt: now,
+        })
+        .returning();
+      await db.insert(memoryEvents).values({
+        memoryId: created.id,
+        eventType: 'created',
+        payload: { entryId: entry.id, tier: op.tier, reason: op.reason },
+      });
+    } else if (op.op === 'update') {
+      if (!storeById.has(op.id)) continue;
+      await db
+        .update(userMemories)
+        .set({
+          ...(op.fact ? { title: op.fact.slice(0, 120), summary: op.fact } : {}),
+          ...(op.importance !== undefined ? { importance: clamp(op.importance) } : {}),
+          evidenceEntryId: entry.id,
+          lastSeenAt: now,
+          updatedAt: now,
+        })
+        .where(eq(userMemories.id, op.id));
+      await db.insert(memoryEvents).values({
+        memoryId: op.id,
+        eventType: 'updated',
+        payload: { entryId: entry.id, reason: op.reason },
+      });
+    } else if (op.op === 'promote') {
+      if (!storeById.has(op.id)) continue;
+      await db
+        .update(userMemories)
+        .set({ tier: 'core', updatedAt: now })
+        .where(eq(userMemories.id, op.id));
+      await db.insert(memoryEvents).values({
+        memoryId: op.id,
+        eventType: 'updated',
+        payload: { entryId: entry.id, tierChange: { from: 'working', to: 'core' }, reason: op.reason },
+      });
+    } else if (op.op === 'demote') {
+      if (!storeById.has(op.id)) continue;
+      await db
+        .update(userMemories)
+        .set({ tier: 'working', updatedAt: now })
+        .where(eq(userMemories.id, op.id));
+      await db.insert(memoryEvents).values({
+        memoryId: op.id,
+        eventType: 'updated',
+        payload: { entryId: entry.id, tierChange: { from: 'core', to: 'working' }, reason: op.reason },
+      });
+    } else if (op.op === 'delete') {
+      if (!storeById.has(op.id)) continue;
+      await db.insert(memoryEvents).values({
+        memoryId: op.id,
+        eventType: 'archived',
+        payload: { entryId: entry.id, reason: op.reason },
+      });
+      await db
+        .update(userMemories)
+        .set({ status: 'archived', archivedAt: now, updatedAt: now })
+        .where(eq(userMemories.id, op.id));
     }
   }
 }
 
-async function processEntryChangedJob({
-  payload,
-  retryCount = 0,
-}: {
-  payload: unknown;
-  retryCount?: number;
-}) {
-  const parsed = payload as Partial<MemoryEntryChangedJob>;
-
-  if (
-    parsed?.jobVersion !== MEMORY_JOB_VERSION ||
-    !parsed.userId ||
-    !parsed.entryId ||
-    !parsed.entryUpdatedAt
-  ) {
-    throw new MemoryJobValidationError('Invalid memory job payload');
-  }
-
-  const jobId = parsed.jobId ?? 'unknown';
-  const idempotencyKey = buildMemoryProcessKey({
-    entryId: parsed.entryId,
-    entryUpdatedAt: parsed.entryUpdatedAt,
-  });
-
-  await observabilityService.recordQueueJobEvent({
-    jobId,
-    jobType: 'memory_entry_changed',
-    userId: parsed.userId,
-    entryId: null,
-    status: 'processing',
-    retryCount,
-    metadata: { idempotencyKey, entryId: parsed.entryId },
-  });
-
-  const [alreadyProcessed] = await db
-    .select({ id: memoryEvents.id })
-    .from(memoryEvents)
-    .where(
-      and(
-        eq(memoryEvents.eventType, 'updated'),
-        sql`${memoryEvents.payload} ->> 'idempotencyKey' = ${idempotencyKey}`,
-      ),
-    )
-    .limit(1);
-
-  if (alreadyProcessed) {
-    await observabilityService.recordQueueJobEvent({
-      jobId,
-      jobType: 'memory_entry_changed',
-      userId: parsed.userId,
-      entryId: null,
-      status: 'skipped',
-      retryCount,
-      outcome: 'idempotent_duplicate',
-      metadata: { idempotencyKey, entryId: parsed.entryId, reason: 'idempotent-duplicate' },
-    });
-    return { skipped: true as const, reason: 'idempotent-duplicate', idempotencyKey };
-  }
-
-  const [entry] = await db
-    .select()
-    .from(entries)
-    .where(and(eq(entries.id, parsed.entryId), eq(entries.userId, parsed.userId)))
-    .limit(1);
-
-  if (!entry) {
-    await observabilityService.recordQueueJobEvent({
-      jobId,
-      jobType: 'memory_entry_changed',
-      userId: parsed.userId,
-      entryId: null,
-      status: 'failed',
-      retryCount,
-      outcome: 'validation_error',
-      errorMessage: 'Entry not found for memory job',
-      metadata: { idempotencyKey, entryId: parsed.entryId },
-    });
-    throw new MemoryJobValidationError('Entry not found for memory job');
-  }
-
-  const payloadUpdatedAt = new Date(parsed.entryUpdatedAt);
-  if (Number.isNaN(payloadUpdatedAt.getTime())) {
-    await observabilityService.recordQueueJobEvent({
-      jobId,
-      jobType: 'memory_entry_changed',
-      userId: parsed.userId,
-      entryId: parsed.entryId,
-      status: 'failed',
-      retryCount,
-      outcome: 'validation_error',
-      errorMessage: 'Invalid entryUpdatedAt timestamp',
-      metadata: { idempotencyKey },
-    });
-    throw new MemoryJobValidationError('Invalid entryUpdatedAt timestamp');
-  }
-
+async function runCuration(entry: Entry): Promise<void> {
   const plainText = (entry.plainText ?? '').trim();
+
   if (!plainText) {
-    await db.insert(memoryEvents).values({
-      memoryId: null,
-      eventType: 'updated',
-      payload: {
-        idempotencyKey,
-        jobId: parsed.jobId,
-        entryId: entry.id,
-        userId: parsed.userId,
-        outcome: 'no-entry-text',
-        processedAt: new Date().toISOString(),
-      },
-    });
-    await observabilityService.recordQueueJobEvent({
-      jobId,
-      jobType: 'memory_entry_changed',
-      userId: parsed.userId,
-      entryId: parsed.entryId,
-      status: 'skipped',
-      retryCount,
-      outcome: 'no_entry_text',
-      metadata: { idempotencyKey, reason: 'empty-entry-text' },
-    });
-    return { skipped: true as const, reason: 'empty-entry-text', idempotencyKey };
+    await db
+      .update(entries)
+      .set({ memoryCuratedAt: new Date() })
+      .where(eq(entries.id, entry.id));
+    return;
   }
 
-  const existingMemories = await db
-    .select()
-    .from(userMemories)
-    .where(
-      and(
-        eq(userMemories.userId, parsed.userId),
-        inArray(userMemories.status, ['active', 'stale']),
-      ),
-    )
-    .orderBy(desc(userMemories.lastSeenAt))
-    .limit(150);
+  const store = await loadActiveStore(entry.userId);
+  const storeInput: CuratorStoreEntry[] = store.map((m) => ({
+    id: m.id,
+    tier: m.tier,
+    category: m.category,
+    summary: m.summary,
+    importance: m.importance,
+  }));
 
-  const extracted = await extractMemoriesFromEntry({
+  let ops = await callCurator({
+    store: storeInput,
     entryText: plainText,
-    existingMemories: existingMemories.map((m) => ({
-      category: m.category,
-      title: m.title,
-      summary: m.summary,
-    })),
-    userId: parsed.userId,
+    userId: entry.userId,
     entryId: entry.id,
   });
 
-  if (extracted.length === 0) {
-    await db.insert(memoryEvents).values({
-      memoryId: null,
-      eventType: 'updated',
-      payload: {
-        idempotencyKey,
-        jobId: parsed.jobId,
-        entryId: entry.id,
-        userId: parsed.userId,
-        outcome: 'no-candidates',
-        processedAt: new Date().toISOString(),
-      },
-    });
-    await observabilityService.recordQueueJobEvent({
-      jobId,
-      jobType: 'memory_entry_changed',
-      userId: parsed.userId,
-      entryId: parsed.entryId,
-      status: 'skipped',
-      retryCount,
-      outcome: 'no_candidates',
-      metadata: { idempotencyKey, reason: 'no-candidates' },
-    });
-    return { skipped: true as const, reason: 'no-candidates', idempotencyKey };
-  }
-
-  const existingByCanonical = new Map<string, UserMemory>();
-  const existingByTitle = new Map<string, UserMemory>();
-  for (const memory of existingMemories) {
-    if (memory.canonicalKey) existingByCanonical.set(memory.canonicalKey, memory);
-    existingByTitle.set(`${memory.category}:${normalizeForKey(memory.title)}`, memory);
-  }
-
-  const changedMemoryIds: string[] = [];
-  const now = new Date();
-
-  for (const candidate of extracted) {
-    const canonicalKey = buildCanonicalKey(candidate.category, candidate.fact);
-    const title = candidate.fact.slice(0, 120);
-    const fallbackTitleKey = `${candidate.category}:${normalizeForKey(title)}`;
-    const matched =
-      (canonicalKey ? existingByCanonical.get(canonicalKey) : undefined) ??
-      existingByTitle.get(fallbackTitleKey);
-
-    if (candidate.operation === 'archive_hint' && matched) {
-      await db
-        .update(userMemories)
-        .set({
-          status: 'stale',
-          archivedAt: null,
-          confidence: clamp(candidate.confidence),
-          lastSeenAt: now,
-          updatedAt: now,
-        })
-        .where(eq(userMemories.id, matched.id));
-      changedMemoryIds.push(matched.id);
-
-      await db.insert(memoryEvents).values({
-        memoryId: matched.id,
-        eventType: 'archived',
-        payload: { reason: 'archive_hint', idempotencyKey, entryId: entry.id },
-      });
-      continue;
-    }
-
-    if (matched) {
-      await db
-        .update(userMemories)
-        .set({
-          title,
-          summary: candidate.fact,
-          evidenceEntryId: entry.id,
-          confidence: clamp(Math.max(matched.confidence, candidate.confidence)),
-          importance: clamp(Math.max(matched.importance, categoryImportance[candidate.category])),
-          status: 'active',
-          source: 'entry',
-          lastSeenAt: now,
-          updatedAt: now,
-        })
-        .where(eq(userMemories.id, matched.id));
-
-      changedMemoryIds.push(matched.id);
-      await db.insert(memoryEvents).values({
-        memoryId: matched.id,
-        eventType: 'merged',
-        payload: {
-          idempotencyKey,
-          entryId: entry.id,
-          canonicalKey,
-          confidence: candidate.confidence,
-          evidenceSpan: candidate.evidenceSpan,
-        },
-      });
-      continue;
-    }
-
-    const insertValues: NewUserMemory = {
-      userId: parsed.userId,
-      category: candidate.category,
-      title,
-      summary: candidate.fact,
-      evidenceEntryId: entry.id,
-      canonicalKey,
-      confidence: clamp(candidate.confidence),
-      importance: categoryImportance[candidate.category],
-      firstSeenAt: now,
-      lastSeenAt: now,
-      status: 'active',
-      source: 'entry',
-    };
-
-    const [created] = await db.insert(userMemories).values(insertValues).returning();
-    changedMemoryIds.push(created.id);
-
-    await db.insert(memoryEvents).values({
-      memoryId: created.id,
-      eventType: 'created',
-      payload: {
-        idempotencyKey,
-        entryId: entry.id,
-        canonicalKey,
-        confidence: candidate.confidence,
-        evidenceSpan: candidate.evidenceSpan,
-      },
-    });
-  }
-
-  for (const memoryId of changedMemoryIds) {
-    const [memory] = await db
-      .select()
-      .from(userMemories)
-      .where(eq(userMemories.id, memoryId))
-      .limit(1);
-    if (!memory) continue;
-    await upsertMemoryEmbedding({
-      memoryId: memory.id,
-      text: `${memory.title}\n${memory.summary}`,
-      userId: parsed.userId,
+  const validation = validateOps(ops, store);
+  if (!validation.valid) {
+    ops = await callCurator({
+      store: storeInput,
+      entryText: plainText,
+      userId: entry.userId,
       entryId: entry.id,
+      extraInstruction: `CONSTRAINT VIOLATION: ${validation.reason}. You MUST emit delete/demote ops to stay within caps before adding new memories.`,
     });
+    const revalidation = validateOps(ops, store);
+    if (!revalidation.valid) {
+      console.warn(`[memory-curator] Discarding ops after two violations: ${revalidation.reason}`);
+      ops = [];
+    }
   }
 
-  await db.insert(memoryEvents).values({
-    memoryId: null,
-    eventType: 'updated',
-    payload: {
-      idempotencyKey,
-      jobId: parsed.jobId,
-      userId: parsed.userId,
-      entryId: entry.id,
-      processedAt: new Date().toISOString(),
-      changedMemoryCount: changedMemoryIds.length,
-    },
-  });
-
-  await observabilityService.recordQueueJobEvent({
-    jobId,
-    jobType: 'memory_entry_changed',
-    userId: parsed.userId,
-    entryId: parsed.entryId,
-    status: 'completed',
-    retryCount,
-    outcome: 'success',
-    metadata: { idempotencyKey, changedMemoryCount: changedMemoryIds.length },
-  });
-
-  return { processed: true as const, idempotencyKey, changedMemoryIds };
+  await applyOps(ops, store, entry);
+  await db
+    .update(entries)
+    .set({ memoryCuratedAt: new Date() })
+    .where(eq(entries.id, entry.id));
 }
 
-const memoriesPipelineServiceRaw = {
-  async publishEntryChangedJob({
-    userId,
-    entryId,
-    entryUpdatedAt,
-  }: {
-    userId: string;
-    entryId: string;
-    entryUpdatedAt: string;
-  }) {
-    const jobId = randomUUID();
-    const job: MemoryEntryChangedJob = {
-      jobVersion: MEMORY_JOB_VERSION,
-      jobId,
-      userId,
-      entryId,
-      entryUpdatedAt,
-    };
-
-    await observabilityService.recordQueueJobEvent({
-      jobId,
-      jobType: 'memory_entry_changed',
-      userId,
-      entryId,
-      status: 'published',
-      retryCount: 0,
-      metadata: { entryUpdatedAt, mode: 'inline' },
-    });
-
-    void runEntryChangedJobWithRetries(job).catch((error) => {
-      console.error('[memory-pipeline] Failed to run memory job:', error);
-    });
-
-    return { published: true as const, job };
+const memoriesCuratorServiceRaw = {
+  async curateEntry(entry: Entry): Promise<void> {
+    try {
+      await runCuration(entry);
+    } catch (error) {
+      console.error('[memory-curator] Curation failed, entry stays due:', error);
+    }
   },
 
-  processEntryChangedJob,
+  async consolidateMemories({ userId }: { userId: string }): Promise<void> {
+    const dueEntries = await db
+      .select()
+      .from(entries)
+      .where(
+        and(
+          eq(entries.userId, userId),
+          or(isNull(entries.memoryCuratedAt), sql`${entries.memoryCuratedAt} < ${entries.updatedAt}`),
+        ),
+      )
+      .orderBy(entries.entryDate);
+
+    for (const entry of dueEntries) {
+      const [claimed] = await db
+        .update(entries)
+        .set({ memoryCuratedAt: new Date() })
+        .where(
+          and(
+            eq(entries.id, entry.id),
+            or(
+              isNull(entries.memoryCuratedAt),
+              sql`${entries.memoryCuratedAt} < ${entries.updatedAt}`,
+            ),
+          ),
+        )
+        .returning({ id: entries.id });
+
+      if (!claimed) continue;
+
+      try {
+        await runCuration(entry);
+      } catch (error) {
+        console.error(`[memory-curator] Failed entry ${entry.id}, resetting to due:`, error);
+        await db
+          .update(entries)
+          .set({ memoryCuratedAt: null })
+          .where(eq(entries.id, entry.id));
+      }
+    }
+  },
 };
 
-export const memoriesPipelineService = wrapService(
-  'memoriesPipelineService',
-  memoriesPipelineServiceRaw,
+export const memoriesCuratorService = wrapService(
+  'memoriesCuratorService',
+  memoriesCuratorServiceRaw,
 );

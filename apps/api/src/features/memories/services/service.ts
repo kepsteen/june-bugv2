@@ -2,26 +2,12 @@ import { and, desc, eq, inArray } from 'drizzle-orm';
 import { db } from '@/lib/db/index.js';
 import { NotFoundError } from '@/lib/errors/index.js';
 import { wrapService } from '@/lib/service-wrapper.js';
-import {
-  memoryCategoryEnum,
-  memoryEmbeddings,
-  memoryStatusEnum,
-  userMemories,
-} from '../table.js';
+import { memoryCategoryEnum, memoryStatusEnum, userMemories } from '../table.js';
 import { entries } from '@/features/entries/entries.table.js';
-import { memoriesPipelineService } from './pipeline.service.js';
-import { embedMemoryText } from '../helpers/embedding.helpers.js';
+import { memoriesCuratorService } from './pipeline.service.js';
 import { aiGateway } from '@/lib/ai/ai.gateway.js';
-import type {
-  MemoryCategory,
-  MemoryForPrompt,
-  PersonalizedPromptSuggestion,
-} from '@starter/shared';
+import type { MemoryCategory, MemoryForPrompt, PersonalizedPromptSuggestion } from '@starter/shared';
 import type { UserMemory } from '../table.js';
-import {
-  cosineSimilarity,
-  scoreMemoryForRetrieval,
-} from '../helpers/retrieval.helpers.js';
 import z from 'zod';
 
 type MemoryCategoryEnum = (typeof memoryCategoryEnum.enumValues)[number];
@@ -69,9 +55,7 @@ async function generatePersonalizedPromptSuggestions({
   entryId?: string;
 }): Promise<PersonalizedPromptSuggestion[]> {
   const safeMax = Math.max(3, Math.min(maxPrompts, 5));
-  const activeMemories = memories.filter((memory) => memory.status !== 'archived');
-  const model = 'openai/gpt-4o-mini';
-  const requestContext = { entryId, focusCategory, memoryCount: activeMemories.length };
+  const activeMemories = memories.filter((m) => m.status !== 'archived');
 
   if (activeMemories.length === 0) {
     return [
@@ -84,10 +68,9 @@ async function generatePersonalizedPromptSuggestions({
   }
 
   const memoryContext = activeMemories
-    .slice(0, 30)
     .map(
-      (memory) =>
-        `- [${memory.category}] ${memory.title} | ${memory.summary} | importance=${memory.importance.toFixed(2)} confidence=${memory.confidence.toFixed(2)} status=${memory.status}`,
+      (m) =>
+        `- [${m.tier.toUpperCase()}][${m.category}] ${m.title} | ${m.summary} | importance=${m.importance.toFixed(2)}`,
     )
     .join('\n');
 
@@ -101,24 +84,21 @@ async function generatePersonalizedPromptSuggestions({
     focusCategory ? `Prioritize focus category: ${focusCategory}.` : 'No forced category.',
     entryDraft?.trim() ? `Entry draft context:\n${entryDraft}` : 'No draft context provided.',
     '',
-    'Memory context:',
+    'Memory context (CORE = protected long-term; WORKING = recent context):',
     memoryContext,
   ].join('\n');
 
   const { data } = await aiGateway.generateObject({
-    model,
+    model: 'openai/gpt-4o-mini',
     prompt,
-    schema: z.object({
-      prompts: z.array(personalizedPromptSchema).min(3).max(5),
-    }),
+    schema: z.object({ prompts: z.array(personalizedPromptSchema).min(3).max(5) }),
     userId,
     feature: 'personalized_prompts',
-    requestContext,
+    requestContext: { entryId, focusCategory, memoryCount: activeMemories.length },
   });
 
-  const prompts = data.prompts ?? [];
   const unique = new Map<string, PersonalizedPromptSuggestion>();
-  for (const suggestion of prompts) unique.set(suggestion.prompt, suggestion);
+  for (const suggestion of data.prompts ?? []) unique.set(suggestion.prompt, suggestion);
   return [...unique.values()].slice(0, safeMax);
 }
 
@@ -132,14 +112,14 @@ const memoriesServiceRaw = {
     category?: MemoryCategoryEnum;
     status?: MemoryStatusEnum;
   }): Promise<UserMemory[]> {
-    const whereConditions = [eq(userMemories.userId, userId)];
-    if (category) whereConditions.push(eq(userMemories.category, category));
-    if (status) whereConditions.push(eq(userMemories.status, status));
+    const conditions = [eq(userMemories.userId, userId)];
+    if (category) conditions.push(eq(userMemories.category, category));
+    if (status) conditions.push(eq(userMemories.status, status));
 
     return db
       .select()
       .from(userMemories)
-      .where(and(...whereConditions))
+      .where(and(...conditions))
       .orderBy(desc(userMemories.importance), desc(userMemories.lastSeenAt));
   },
 
@@ -152,7 +132,7 @@ const memoriesServiceRaw = {
   }): Promise<{
     accepted: true;
     message: string;
-    request: { userId: string; reason: 'manual' | 'backfill' | 'debug'; entryId?: string };
+    request: { userId: string; reason: string; entryId?: string };
   }> {
     const [latestEntry] = await db
       .select()
@@ -162,17 +142,15 @@ const memoriesServiceRaw = {
       .limit(1);
 
     if (latestEntry) {
-      await memoriesPipelineService.publishEntryChangedJob({
-        userId,
-        entryId: latestEntry.id,
-        entryUpdatedAt: latestEntry.updatedAt.toISOString(),
+      void memoriesCuratorService.curateEntry(latestEntry).catch((err) => {
+        console.error('[memoriesService] enqueueRefresh curation error:', err);
       });
     }
 
     return {
       accepted: true,
       message: latestEntry
-        ? 'Latest entry has been enqueued for memory refresh.'
+        ? 'Memory curation triggered for your latest entry.'
         : 'No entries available to refresh memories yet.',
       request: { userId, reason, entryId: latestEntry?.id },
     };
@@ -185,9 +163,7 @@ const memoriesServiceRaw = {
       .where(and(eq(userMemories.id, id), eq(userMemories.userId, userId)))
       .limit(1);
 
-    if (!existing) {
-      throw new NotFoundError('Memory not found');
-    }
+    if (!existing) throw new NotFoundError('Memory not found');
 
     await db
       .delete(userMemories)
@@ -203,30 +179,25 @@ const memoriesServiceRaw = {
     category?: MemoryCategoryEnum;
     status?: MemoryStatusEnum;
   }): Promise<void> {
-    const whereConditions = [eq(userMemories.userId, userId)];
-    if (category) whereConditions.push(eq(userMemories.category, category));
-    if (status) whereConditions.push(eq(userMemories.status, status));
+    const conditions = [eq(userMemories.userId, userId)];
+    if (category) conditions.push(eq(userMemories.category, category));
+    if (status) conditions.push(eq(userMemories.status, status));
 
-    await db.delete(userMemories).where(and(...whereConditions));
+    await db.delete(userMemories).where(and(...conditions));
   },
 
   async generatePersonalizedPrompts({
     userId,
     focusCategory,
     entryDraft,
+    entryId,
   }: {
     userId: string;
     focusCategory?: MemoryCategory;
     entryDraft?: string;
-  }): Promise<{
-    prompts: PersonalizedPromptSuggestion[];
-    retrieval: {
-      structuredCount: number;
-      semanticCount: number;
-      consideredCount: number;
-    };
-  }> {
-    const memories = await db
+    entryId?: string;
+  }): Promise<{ prompts: PersonalizedPromptSuggestion[]; memoryCount: number }> {
+    const store = await db
       .select()
       .from(userMemories)
       .where(
@@ -235,79 +206,29 @@ const memoriesServiceRaw = {
           inArray(userMemories.status, ['active', 'stale']),
         ),
       )
-      .orderBy(desc(userMemories.lastSeenAt))
-      .limit(250);
+      .orderBy(desc(userMemories.importance))
+      .limit(32);
 
-    const structuredRanked = memories
-      .map((memory) => {
-        return {
-          memory,
-          score: scoreMemoryForRetrieval({ memory, focusCategory }),
-        };
-      })
-      .sort((a, b) => b.score - a.score);
-
-    const topStructured = structuredRanked.slice(0, 12).map((item) => item.memory);
-
-    const semanticQuery = (entryDraft?.trim() || focusCategory || 'developer progress and goals').trim();
-    const { embedding: queryVector } = await embedMemoryText({
-      text: semanticQuery,
-      userId,
-    });
-    const embeddingRows = await db
-      .select({
-        memory: userMemories,
-        embedding: memoryEmbeddings.embedding,
-      })
-      .from(memoryEmbeddings)
-      .innerJoin(userMemories, eq(memoryEmbeddings.memoryId, userMemories.id))
-      .where(
-        and(
-          eq(userMemories.userId, userId),
-          inArray(userMemories.status, ['active', 'stale']),
-        ),
-      )
-      .limit(250);
-
-    const topSemantic = embeddingRows
-      .map((row) => ({
-        memory: row.memory,
-        similarity: cosineSimilarity(row.embedding, queryVector),
-      }))
-      .sort((a, b) => b.similarity - a.similarity)
-      .slice(0, 8)
-      .map((item) => item.memory);
-
-    const retrievalPool = new Map<string, UserMemory>();
-    for (const memory of topStructured) retrievalPool.set(memory.id, memory);
-    for (const memory of topSemantic) retrievalPool.set(memory.id, memory);
-
-    const candidateMemories = [...retrievalPool.values()];
     const prompts = await generatePersonalizedPromptSuggestions({
-      memories: candidateMemories.map((memory) => ({
-        category: memory.category,
-        title: memory.title,
-        summary: memory.summary,
-        importance: memory.importance,
-        confidence: memory.confidence,
-        status: memory.status,
-        projectName: memory.projectName,
-        milestoneState: memory.milestoneState,
+      memories: store.map((m) => ({
+        category: m.category,
+        tier: m.tier,
+        title: m.title,
+        summary: m.summary,
+        importance: m.importance,
+        confidence: m.confidence,
+        status: m.status,
+        projectName: m.projectName,
+        milestoneState: m.milestoneState,
       })),
       focusCategory,
       entryDraft,
       maxPrompts: 5,
       userId,
+      entryId,
     });
 
-    return {
-      prompts,
-      retrieval: {
-        structuredCount: topStructured.length,
-        semanticCount: topSemantic.length,
-        consideredCount: candidateMemories.length,
-      },
-    };
+    return { prompts, memoryCount: store.length };
   },
 };
 

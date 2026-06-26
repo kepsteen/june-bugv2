@@ -3,7 +3,7 @@ import { db } from '@/lib/db/index.js';
 import { wrapService } from '@/lib/service-wrapper.js';
 import { NotFoundError } from '@/lib/errors/index.js';
 import { entries } from '@/features/entries/entries.table.js';
-import { memoriesService } from '@/features/memories/index.js';
+import { memoriesService, memoriesCuratorService } from '@/features/memories/index.js';
 import { entryPrompts } from '../table.js';
 import type { MemoryCategory } from '@starter/shared';
 import {
@@ -67,10 +67,17 @@ const promptsServiceRaw = {
     const existing = await listStoredPrompts({ userId, entryId, focusCategory });
     if (existing.length > 0) return mapRowsToStoredPromptsResult(existing);
 
+    try {
+      await memoriesCuratorService.consolidateMemories({ userId });
+    } catch (err) {
+      console.error('[promptsService] Memory consolidation failed, using current store:', err);
+    }
+
     const generated = await memoriesService.generatePersonalizedPrompts({
       userId,
       focusCategory,
       entryDraft: entryDraft?.trim() ? entryDraft : (entry.plainText?.trim() || undefined),
+      entryId,
     });
 
     const insertValues = buildInsertValues({
@@ -109,6 +116,13 @@ const promptsServiceRaw = {
     entryDraft?: string;
   }): Promise<StoredPersonalizedPromptsResult> {
     const entry = await findEntryForUser({ entryId, userId });
+
+    try {
+      await memoriesCuratorService.consolidateMemories({ userId });
+    } catch (err) {
+      console.error('[promptsService] Memory consolidation failed during regenerate, using current store:', err);
+    }
+
     const generated = await memoriesService.generatePersonalizedPrompts({
       userId,
       focusCategory,

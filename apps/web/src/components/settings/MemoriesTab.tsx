@@ -17,7 +17,7 @@ import {
   useDeleteMemoryMutation,
   useGetMemoriesQuery,
 } from '@/hooks/api';
-import type { MemoryCategory, MemoryStatus, UserMemory } from '@/lib/api';
+import type { MemoryCategory, MemoryStatus, MemoryTier, UserMemory } from '@/lib/api';
 
 const memoryCategories: Array<{ value: MemoryCategory; label: string }> = [
   { value: 'goal', label: 'Goal' },
@@ -62,6 +62,10 @@ function getStatusBadgeVariant(status: MemoryStatus): 'default' | 'secondary' | 
   return 'outline';
 }
 
+function getTierLabel(tier: MemoryTier): string {
+  return tier === 'core' ? 'Core' : 'Working';
+}
+
 function MemoryRow({
   memory,
   isDeleting,
@@ -76,6 +80,9 @@ function MemoryRow({
       <div className="min-w-0 flex-1 space-y-1.5">
         <div className="flex flex-wrap items-center gap-2">
           <h3 className="text-sm font-medium">{memory.title}</h3>
+          <Badge variant={memory.tier === 'core' ? 'default' : 'secondary'} className="text-xs">
+            {getTierLabel(memory.tier)}
+          </Badge>
           <Badge variant="outline">{getCategoryLabel(memory.category)}</Badge>
           <Badge variant={getStatusBadgeVariant(memory.status)}>
             {getStatusLabel(memory.status)}
@@ -113,6 +120,47 @@ function MemoryRow({
   );
 }
 
+function TierSection({
+  tier,
+  cap,
+  memories,
+  isDeleting,
+  pendingDeleteId,
+  onRemove,
+}: {
+  tier: MemoryTier;
+  cap: number;
+  memories: UserMemory[];
+  isDeleting: boolean;
+  pendingDeleteId: string | null;
+  onRemove: (memory: UserMemory) => void;
+}) {
+  if (memories.length === 0) return null;
+
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center gap-2">
+        <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          {tier === 'core' ? 'Core' : 'Working'}
+        </span>
+        <span className="text-xs text-muted-foreground">
+          {memories.length}/{cap}
+        </span>
+      </div>
+      <div className="divide-y rounded-lg border px-3">
+        {memories.map((memory) => (
+          <MemoryRow
+            key={memory.id}
+            memory={memory}
+            isDeleting={pendingDeleteId === memory.id}
+            onRemove={onRemove}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function MemoriesTab() {
   const [categoryFilter, setCategoryFilter] = useState<MemoryCategory | 'all'>('all');
   const [statusFilter, setStatusFilter] = useState<MemoryStatus | 'all'>('all');
@@ -141,6 +189,9 @@ export function MemoriesTab() {
   const memories = memoriesQuery.data?.data ?? [];
   const isDeleting = pendingDeleteId !== null || deleteMemoriesMutation.isPending;
 
+  const coreMemories = memories.filter((m) => m.tier === 'core');
+  const workingMemories = memories.filter((m) => m.tier === 'working');
+
   const handleRemoveClick = (memory: UserMemory) => {
     setMemoryToDelete(memory);
     setSingleDeleteOpen(true);
@@ -148,7 +199,6 @@ export function MemoriesTab() {
 
   const handleConfirmSingleDelete = async () => {
     if (!memoryToDelete) return;
-
     try {
       setPendingDeleteId(memoryToDelete.id);
       await deleteMemoryMutation.mutateAsync(memoryToDelete.id);
@@ -174,11 +224,11 @@ export function MemoriesTab() {
     if (hasActiveFilters) {
       const totalCount = allMemoriesQuery.data?.data.length ?? 0;
       if (allMemoriesQuery.isSuccess && totalCount === 0) {
-        return 'You don\u2019t have any memories yet.';
+        return 'You don’t have any memories yet.';
       }
       return 'No memories matched the selected filters.';
     }
-    return 'You don\u2019t have any memories yet.';
+    return 'You don’t have any memories yet.';
   })();
 
   return (
@@ -267,15 +317,23 @@ export function MemoriesTab() {
       ) : null}
 
       {!memoriesQuery.isPending && !memoriesQuery.isError && memories.length > 0 ? (
-        <div className="divide-y">
-          {memories.map((memory) => (
-            <MemoryRow
-              key={memory.id}
-              memory={memory}
-              isDeleting={pendingDeleteId === memory.id}
-              onRemove={handleRemoveClick}
-            />
-          ))}
+        <div className="space-y-4">
+          <TierSection
+            tier="core"
+            cap={8}
+            memories={coreMemories}
+            isDeleting={isDeleting}
+            pendingDeleteId={pendingDeleteId}
+            onRemove={handleRemoveClick}
+          />
+          <TierSection
+            tier="working"
+            cap={24}
+            memories={workingMemories}
+            isDeleting={isDeleting}
+            pendingDeleteId={pendingDeleteId}
+            onRemove={handleRemoveClick}
+          />
         </div>
       ) : null}
 

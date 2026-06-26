@@ -16,9 +16,9 @@ describe('prompts service persistence helpers', () => {
         anchorCategory: 'goal',
         anchorMemoryTitle: 'Ship prompt persistence',
         sortOrder: 0,
-        retrievalStructuredCount: 5,
-        retrievalSemanticCount: 3,
-        retrievalConsideredCount: 6,
+        retrievalStructuredCount: 0,
+        retrievalSemanticCount: 0,
+        retrievalConsideredCount: 12,
         createdAt: now,
         updatedAt: now,
       },
@@ -32,9 +32,9 @@ describe('prompts service persistence helpers', () => {
         anchorCategory: null,
         anchorMemoryTitle: null,
         sortOrder: 1,
-        retrievalStructuredCount: 5,
-        retrievalSemanticCount: 3,
-        retrievalConsideredCount: 6,
+        retrievalStructuredCount: 0,
+        retrievalSemanticCount: 0,
+        retrievalConsideredCount: 12,
         createdAt: now,
         updatedAt: now,
       },
@@ -42,19 +42,12 @@ describe('prompts service persistence helpers', () => {
 
     const result = mapRowsToStoredPromptsResult(rows);
 
-    expect(result.retrieval).toEqual({
-      structuredCount: 5,
-      semanticCount: 3,
-      consideredCount: 6,
-    });
+    expect(result.memoryCount).toBe(12);
     expect(result.prompts).toEqual([
       {
         prompt: 'What concrete next step moved my current goal forward today?',
         rationale: 'Anchored to the user goal memory.',
-        anchor: {
-          category: 'goal',
-          memoryTitle: 'Ship prompt persistence',
-        },
+        anchor: { category: 'goal', memoryTitle: 'Ship prompt persistence' },
       },
       {
         prompt: 'What evidence shows I made measurable progress?',
@@ -64,16 +57,13 @@ describe('prompts service persistence helpers', () => {
     ]);
   });
 
-  it('builds insert rows with stable ordering and retrieval metadata', () => {
+  it('builds insert rows with stable ordering and memory count metadata', () => {
     const generated = {
       prompts: [
         {
           prompt: 'What blocker can I make smaller today?',
           rationale: 'Keeps attention on unblockers.',
-          anchor: {
-            category: 'blocker' as const,
-            memoryTitle: 'OAuth callback issue',
-          },
+          anchor: { category: 'blocker' as const, memoryTitle: 'OAuth callback issue' },
         },
         {
           prompt: 'What did I learn that will help tomorrow?',
@@ -81,11 +71,7 @@ describe('prompts service persistence helpers', () => {
           anchor: null,
         },
       ],
-      retrieval: {
-        structuredCount: 7,
-        semanticCount: 4,
-        consideredCount: 8,
-      },
+      memoryCount: 14,
     };
 
     const rows = buildInsertValues({
@@ -103,14 +89,8 @@ describe('prompts service persistence helpers', () => {
       sortOrder: 0,
       anchorCategory: 'blocker',
       anchorMemoryTitle: 'OAuth callback issue',
-      retrievalStructuredCount: 7,
-      retrievalSemanticCount: 4,
-      retrievalConsideredCount: 8,
+      retrievalConsideredCount: 14,
     });
-    expect(rows[1]).toMatchObject({
-      sortOrder: 1,
-      anchorCategory: null,
-      anchorMemoryTitle: null,
-    });
+    expect(rows[1]).toMatchObject({ sortOrder: 1, anchorCategory: null, anchorMemoryTitle: null });
   });
 });

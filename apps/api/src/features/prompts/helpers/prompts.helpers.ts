@@ -1,15 +1,9 @@
 import type { MemoryCategory, PersonalizedPromptSuggestion } from '@starter/shared';
 import type { EntryPrompt, NewEntryPrompt } from '../table.js';
 
-export type PromptRetrieval = {
-  structuredCount: number;
-  semanticCount: number;
-  consideredCount: number;
-};
-
 export type StoredPersonalizedPromptsResult = {
   prompts: PersonalizedPromptSuggestion[];
-  retrieval: PromptRetrieval;
+  memoryCount: number;
 };
 
 export function mapRowsToStoredPromptsResult(rows: EntryPrompt[]): StoredPersonalizedPromptsResult {
@@ -21,23 +15,10 @@ export function mapRowsToStoredPromptsResult(rows: EntryPrompt[]): StoredPersona
       rationale: row.rationale,
       anchor:
         row.anchorCategory && row.anchorMemoryTitle
-          ? {
-              category: row.anchorCategory,
-              memoryTitle: row.anchorMemoryTitle,
-            }
+          ? { category: row.anchorCategory, memoryTitle: row.anchorMemoryTitle }
           : null,
     })),
-    retrieval: firstRow
-      ? {
-          structuredCount: firstRow.retrievalStructuredCount,
-          semanticCount: firstRow.retrievalSemanticCount,
-          consideredCount: firstRow.retrievalConsideredCount,
-        }
-      : {
-          structuredCount: 0,
-          semanticCount: 0,
-          consideredCount: 0,
-        },
+    memoryCount: firstRow?.retrievalConsideredCount ?? 0,
   };
 }
 
@@ -61,8 +42,8 @@ export function buildInsertValues({
     anchorCategory: prompt.anchor?.category ?? null,
     anchorMemoryTitle: prompt.anchor?.memoryTitle ?? null,
     sortOrder: index,
-    retrievalStructuredCount: generated.retrieval.structuredCount,
-    retrievalSemanticCount: generated.retrieval.semanticCount,
-    retrievalConsideredCount: generated.retrieval.consideredCount,
+    retrievalStructuredCount: 0,
+    retrievalSemanticCount: 0,
+    retrievalConsideredCount: generated.memoryCount,
   }));
 }

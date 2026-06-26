@@ -24,6 +24,7 @@ export const aiUsageFeatureEnum = pgEnum('ai_usage_feature', [
   'entry_title',
   'memory_extraction',
   'memory_embedding',
+  'memory_curation',
   'personalized_prompts',
 ]);
 

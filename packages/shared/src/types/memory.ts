@@ -15,19 +15,16 @@ export const MEMORY_CATEGORIES = [
 
 export type MemoryCategory = (typeof MEMORY_CATEGORIES)[number];
 
-export const MEMORY_OPERATIONS = ['create', 'update', 'archive_hint'] as const;
-
-export type MemoryOperation = (typeof MEMORY_OPERATIONS)[number];
+export type MemoryTier = 'core' | 'working';
 
 export type MemoryStatus = 'active' | 'stale' | 'archived';
 
-export type ExtractedMemoryCandidate = {
-  category: MemoryCategory;
-  fact: string;
-  confidence: number;
-  evidenceSpan: string | null;
-  operation: MemoryOperation;
-};
+export type MemoryOp =
+  | { op: 'create'; tier: MemoryTier; category: MemoryCategory; fact: string; importance: number; reason: string }
+  | { op: 'update'; id: string; fact?: string; importance?: number; reason: string }
+  | { op: 'promote'; id: string; reason: string }
+  | { op: 'demote'; id: string; reason: string }
+  | { op: 'delete'; id: string; reason: string };
 
 export type MemoryForPrompt = {
   category: MemoryCategory;
@@ -36,6 +33,7 @@ export type MemoryForPrompt = {
   importance: number;
   confidence: number;
   status: MemoryStatus;
+  tier: MemoryTier;
   projectName?: string | null;
   milestoneState?: 'planned' | 'in_progress' | 'completed' | 'blocked' | null;
 };

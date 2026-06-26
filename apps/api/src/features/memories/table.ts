@@ -8,24 +8,9 @@ import {
   text,
   timestamp,
   uuid,
-  customType,
 } from 'drizzle-orm/pg-core';
 import { appUsers } from '../app-users/app-users.table';
 import { entries } from '../entries/entries.table';
-
-const vector1536 = customType<{ data: number[]; driverData: string }>({
-  dataType() {
-    return 'vector(1536)';
-  },
-  toDriver(value) {
-    return `[${value.join(',')}]`;
-  },
-  fromDriver(value) {
-    const cleaned = value.replace(/^\[/, '').replace(/\]$/, '').trim();
-    if (!cleaned) return [];
-    return cleaned.split(',').map((part) => Number(part));
-  },
-});
 
 export const memoryCategoryEnum = pgEnum('memory_category', [
   'goal',
@@ -68,6 +53,8 @@ export const memoryEventTypeEnum = pgEnum('memory_event_type', [
   'archived',
 ]);
 
+export const memoryTierEnum = pgEnum('memory_tier', ['core', 'working']);
+
 export const userMemories = pgTable(
   'user_memories',
   {
@@ -76,6 +63,7 @@ export const userMemories = pgTable(
       .notNull()
       .references(() => appUsers.id, { onDelete: 'cascade' }),
     category: memoryCategoryEnum('category').notNull(),
+    tier: memoryTierEnum('tier').notNull().default('working'),
     title: text('title').notNull(),
     summary: text('summary').notNull(),
     evidenceEntryId: uuid('evidence_entry_id').references(() => entries.id, {
@@ -113,20 +101,8 @@ export const userMemories = pgTable(
       table.userId,
       table.canonicalKey,
     ),
+    index('user_memories_user_tier_idx').on(table.userId, table.tier),
   ],
-);
-
-export const memoryEmbeddings = pgTable(
-  'memory_embeddings',
-  {
-    memoryId: uuid('memory_id')
-      .primaryKey()
-      .references(() => userMemories.id, { onDelete: 'cascade' }),
-    embedding: vector1536('embedding').notNull(),
-    embeddingModel: text('embedding_model').notNull(),
-    updatedAt: timestamp('updated_at').defaultNow().notNull(),
-  },
-  (table) => [index('memory_embeddings_updated_idx').on(table.updatedAt)],
 );
 
 export const memoryEvents = pgTable(
@@ -156,18 +132,7 @@ export const userMemoriesRelations = relations(userMemories, ({ one, many }) => 
     fields: [userMemories.evidenceEntryId],
     references: [entries.id],
   }),
-  embedding: one(memoryEmbeddings, {
-    fields: [userMemories.id],
-    references: [memoryEmbeddings.memoryId],
-  }),
   events: many(memoryEvents),
-}));
-
-export const memoryEmbeddingsRelations = relations(memoryEmbeddings, ({ one }) => ({
-  memory: one(userMemories, {
-    fields: [memoryEmbeddings.memoryId],
-    references: [userMemories.id],
-  }),
 }));
 
 export const memoryEventsRelations = relations(memoryEvents, ({ one }) => ({
@@ -179,7 +144,5 @@ export const memoryEventsRelations = relations(memoryEvents, ({ one }) => ({
 
 export type UserMemory = typeof userMemories.$inferSelect;
 export type NewUserMemory = typeof userMemories.$inferInsert;
-export type MemoryEmbedding = typeof memoryEmbeddings.$inferSelect;
-export type NewMemoryEmbedding = typeof memoryEmbeddings.$inferInsert;
 export type MemoryEvent = typeof memoryEvents.$inferSelect;
 export type NewMemoryEvent = typeof memoryEvents.$inferInsert;

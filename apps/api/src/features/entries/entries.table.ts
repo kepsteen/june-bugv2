@@ -20,6 +20,7 @@ export const entries = pgTable(
     content: text('content').notNull().default(''),
     plainText: text('plain_text').default(''),
     Title: text('title'),
+    memoryCuratedAt: timestamp('memory_curated_at'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
   },

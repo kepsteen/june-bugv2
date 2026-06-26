@@ -4,7 +4,6 @@ import { eq, and, desc, gte, lte, ilike } from 'drizzle-orm';
 import { AppError, NotFoundError } from '@/lib/errors/index.js';
 import { wrapService } from '@/lib/service-wrapper.js';
 import { aiGateway } from '@/lib/ai/ai.gateway.js';
-import { memoriesPipelineService } from '@/features/memories/index.js';
 import z from 'zod';
 import type { Entry } from './entries.table.js';
 
@@ -73,14 +72,6 @@ const entriesServiceRaw = {
       plainText: '',
     }).returning();
 
-    void memoriesPipelineService.publishEntryChangedJob({
-      userId,
-      entryId: created.id,
-      entryUpdatedAt: created.updatedAt.toISOString(),
-    }).catch((error) => {
-      console.error('[entriesService] Failed to publish memory job for create:', error);
-    });
-
     return created;
   },
 
@@ -103,14 +94,6 @@ const entriesServiceRaw = {
       .set({ ...data, updatedAt: new Date() })
       .where(and(eq(entries.id, id), eq(entries.userId, userId)))
       .returning();
-
-    void memoriesPipelineService.publishEntryChangedJob({
-      userId,
-      entryId: updated.id,
-      entryUpdatedAt: updated.updatedAt.toISOString(),
-    }).catch((error) => {
-      console.error('[entriesService] Failed to publish memory job for update:', error);
-    });
 
     return updated;
   },
