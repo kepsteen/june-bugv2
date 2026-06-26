@@ -129,14 +129,14 @@ export const MarkdownEditor = forwardRef<
 				if (!view) return;
 
 				const doc = view.state.doc.toString();
-				const { from, to } = view.state.selection.main;
+				const docEnd = doc.length;
 				const docEmpty = !doc.trim();
-				const atLineStart = from === 0 || doc[from - 1] === "\n";
+				const atLineStart = docEmpty || doc[docEnd - 1] === "\n";
 				const block = formatPromptBlock(prompt, atLineStart, docEmpty);
-				const cursorPos = from + block.length;
+				const cursorPos = docEnd + block.length;
 
 				view.dispatch({
-					changes: { from, to, insert: block },
+					changes: { from: docEnd, to: docEnd, insert: block },
 					selection: EditorSelection.cursor(cursorPos),
 					scrollIntoView: true,
 				});
