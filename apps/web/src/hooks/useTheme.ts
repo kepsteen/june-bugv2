@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 
 type Theme = 'light' | 'dark';
 
+//TODO: useTheme will be local to a component, so if two components update/toggle the theme through useTheme, they don't sync with each other. Consider using a store like redux/zustand
 export function useTheme() {
   const [theme, setTheme] = useState<Theme>(() => {
     const stored = localStorage.getItem('theme') as Theme | null;

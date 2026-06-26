@@ -47,6 +47,16 @@ async function generateEntryTitle({
   return data.title;
 }
 
+
+/*
+  TODO: Consider creating a helper method to check if the userId owns the entry ID.
+  function findUserEntry{
+    query to get entry by ID and userId
+    if no entry, throw error
+    return entry;
+  }
+*/
+
 const entriesServiceRaw = {
   async list({ userId }: { userId: string }): Promise<Entry[]> {
     return db.select().from(entries).where(eq(entries.userId, userId)).orderBy(desc(entries.entryDate));
@@ -84,6 +94,7 @@ const entriesServiceRaw = {
     return created;
   },
 
+  //TODO: We need to check if the userId owns the entryID. Bad actor can pass any entry ID and update the title.
   async updateTitle({ id, userId, content }: { id: string; userId: string; content: string }): Promise<Entry> {
     const generatedTitle = await generateEntryTitle({ content, userId, entryId: id });
 
@@ -121,6 +132,8 @@ const entriesServiceRaw = {
     await db.delete(entries).where(and(eq(entries.id, id), eq(entries.userId, userId)));
   },
 
+  //TODO: I would recommend adding pagination for search queries.
+  // TIDI: wild card LIKE queries do not scale well. Fine for now, but this should be optimized later.
   async search({ userId, q }: { userId: string; q: string }): Promise<Entry[]> {
     if (!q.trim()) return entriesServiceRaw.list({ userId });
     return db.select().from(entries)

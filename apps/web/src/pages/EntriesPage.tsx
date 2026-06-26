@@ -42,6 +42,7 @@ export function EntriesPage({ demo = false }: EntriesPageProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [savedTime, setSavedTime] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  //TODO: add a failed state to render error if a save failed
   const [wiggle, setWiggle] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [entryToDelete, setEntryToDelete] = useState<string | null>(null);

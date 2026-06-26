@@ -35,7 +35,7 @@ const entryTagsServiceRaw = {
     if (!entry) throw new NotFoundError('Entry not found');
 
     // Verify tag exists
-    const [tag] = await db.select().from(tags).where(eq(tags.id, tagId));
+    const [tag] = await db.select().from(tags).where(eq(tags.id, tagId)); //TODO: Do we need to check if the tag belongs to the user?
     if (!tag) throw new NotFoundError('Tag not found');
 
     // Insert (ignore duplicate due to unique constraint)
@@ -64,7 +64,7 @@ const entryTagsServiceRaw = {
     if (!entry) throw new NotFoundError('Entry not found');
 
     // Delete all existing tags for this entry
-    await db.delete(entryTags).where(eq(entryTags.entryId, entryId));
+    await db.delete(entryTags).where(eq(entryTags.entryId, entryId));  //TODO: Do we need to check if the tag belongs to the user?
 
     // Insert new tags if any
     if (tagIds.length > 0) {

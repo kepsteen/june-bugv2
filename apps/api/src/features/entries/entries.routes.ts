@@ -6,6 +6,9 @@ import { appUsersService } from '../app-users/app-users.service.js';
 
 const router: RouterType = Router({ mergeParams: true });
 
+//TODO: add zod validation to your requests
+
+//TODO: you have multiple getAppUser functions across multiple files. Make this 1 helper function.
 // Helper: get or create app user from Better Auth session
 async function getAppUser(res: Response) {
   const authUser = res.locals.user; // Better Auth user

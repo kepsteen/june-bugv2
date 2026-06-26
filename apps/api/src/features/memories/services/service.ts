@@ -254,6 +254,8 @@ const memoriesServiceRaw = {
       text: semanticQuery,
       userId,
     });
+
+
     const embeddingRows = await db
       .select({
         memory: userMemories,
@@ -267,8 +269,10 @@ const memoriesServiceRaw = {
           inArray(userMemories.status, ['active', 'stale']),
         ),
       )
-      .limit(250);
+      .limit(250); //TODO: this drops old memories once you reach the 250 limit, this is a bug.
 
+    //TODO: this is fine for now, but doing cosine similarity on all memories is expensive, O(N)
+    // TODO: consider adding an index on memoryEmbeddings to speed up cosine similarity search. That way, getting topSemantic is constant time search instead of O(N)
     const topSemantic = embeddingRows
       .map((row) => ({
         memory: row.memory,

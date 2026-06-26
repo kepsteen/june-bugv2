@@ -15,6 +15,7 @@ export const todos = pgTable(
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
   },
   (table) => [index('todos_user_idx').on(table.userId)],
+  // TODO: consider an index on userId,createdAt to handle sort by date queries
 );
 
 export const todosRelations = relations(todos, ({ one }) => ({

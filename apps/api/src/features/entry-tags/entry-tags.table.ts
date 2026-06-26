@@ -17,6 +17,7 @@ export const entryTags = pgTable(
   },
   (table) => [
     uniqueIndex('entry_tags_entry_tag_idx').on(table.entryId, table.tagId),
+    //TODO: add index on tagId
   ],
 );
 

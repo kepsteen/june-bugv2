@@ -42,6 +42,7 @@ router.get('/stats', AuthMiddleware(), asyncHandler(async (req: Request, res: Re
 
 // GET /:id - get single tag
 router.get('/:id', AuthMiddleware(), asyncHandler(async (req: Request, res: Response) => {
+   //TODO: Do we need to verify that the tag belongs to the user?
   const tag = await tagsService.findById({ id: req.params.id });
   res.json({ data: tag });
 }));

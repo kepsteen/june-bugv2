@@ -115,7 +115,7 @@ async function processEntryChangedJob({
     entryId: parsed.entryId,
     entryUpdatedAt: parsed.entryUpdatedAt,
   });
-
+  //TODO: i would make idempotencyKey its own field column instead of adding it to a json metadata field
   await observabilityService.recordQueueJobEvent({
     jobId,
     jobType: 'memory_entry_changed',
@@ -133,6 +133,7 @@ async function processEntryChangedJob({
       and(
         eq(memoryEvents.eventType, 'updated'),
         sql`${memoryEvents.payload} ->> 'idempotencyKey' = ${idempotencyKey}`,
+          //TODO: since idempotencyKey is in a jsonB object, we need to do a full table scan to find the matching idempotencyKey. make it its own field with an index
       ),
     )
     .limit(1);
