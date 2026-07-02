@@ -1,5 +1,5 @@
 import { format, subDays, startOfDay } from 'date-fns';
-import type { Entry } from './api.js';
+import type { Entry } from './api/index.js';
 
 function toLocalCalendarDate(dateStr: string): Date {
   const d = new Date(dateStr);

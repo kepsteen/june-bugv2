@@ -110,7 +110,7 @@ Every authenticated route resolves the app user via `appUsersService.findOrCreat
 
 ### Frontend (`apps/web`)
 
-**API layer**: `src/lib/api.ts` contains all API client functions (grouped by resource: `entriesApi`, `tagsApi`, etc.) using a shared `request()` helper that always sends `credentials: 'include'`.
+**API layer**: `src/lib/api/` contains API client modules per resource (`entriesApi`, `tagsApi`, etc.) with a shared `request()` helper in `client.ts` that always sends `credentials: 'include'`. Import from `@/lib/api` (barrel at `index.ts`).
 
 **Data fetching**: `src/hooks/api/` contains React Query hooks wrapping `api.ts` functions. Mutation hooks automatically invalidate relevant query keys on success. Use these hooks in components rather than calling `api.ts` directly.
 

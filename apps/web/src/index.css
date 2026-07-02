@@ -72,6 +72,7 @@
     --sidebar-accent-foreground: oklch(0.26 0.02 356.72);
     --sidebar-border: oklch(0.91 0 0);
     --sidebar-ring: oklch(0.71 0 0);
+    --editor-selection: color-mix(in oklch, var(--primary) 24%, var(--background));
   }
 
   .dark {
@@ -102,6 +103,7 @@
     --sidebar-accent-foreground: oklch(0.86 0.05 85.12);
     --sidebar-border: oklch(0.33 0.02 60.7);
     --sidebar-ring: oklch(0.64 0.05 114.58);
+    --editor-selection: color-mix(in oklch, var(--primary) 48%, var(--background));
   }
 
   * {
@@ -128,6 +130,15 @@
 /* Markdown editor */
 .markdown-editor .cm-editor {
   background: transparent;
+}
+
+.markdown-editor .cm-selectionBackground,
+.markdown-editor .cm-editor.cm-focused .cm-selectionBackground {
+  background-color: var(--editor-selection) !important;
+}
+
+.markdown-editor .cm-content ::selection {
+  background-color: var(--editor-selection);
 }
 
 .markdown-editor .cm-placeholder {
